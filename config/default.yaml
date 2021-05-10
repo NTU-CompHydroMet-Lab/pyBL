@@ -1,0 +1,18 @@
+IO:
+  config_path: './timeRange.csv'
+  raw_data_path: './data/test.csv'
+  stats_file_path: './data/staProp_test.csv'
+  weight_file_path: './data/weight_test.csv'
+  theta_store_path: './test_theta.csv'
+  store_sample_stats: true
+  sample_stats_path: './sample_stats.csv'
+fitting:
+  theta_initial:
+  path:
+  moment: 'BLRPRx'
+  intensity_mode: 'exponential'
+sampling:
+  month: 1
+  start_time: '2020-01-01'
+  end_time: '2020-12-31'
+  freq: '5T'

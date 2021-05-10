@@ -1,0 +1,10 @@
+.DS_Store
+*.pyc
+.idea/
+C++Version/
+__pycache__/
+data/*
+*.log
+testCal.py
+Theta.csv
+result/*
