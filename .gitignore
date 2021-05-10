@@ -3,7 +3,6 @@
 .idea/
 C++Version/
 __pycache__/
-data/*
 *.log
 testCal.py
 Theta.csv
