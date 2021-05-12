@@ -5,17 +5,17 @@ pyBL is an open-source Python package for stochastic rainfall modelling based up
 
 This package implements the most recent version of the BL model, based upon the state-of-the-art BL model developed in Onof and Wang (2020), and works with standard and widely-used data format. It also includes a number of numerical solvers; this provides the flexibility of developing model fitting strategies. 
 
-In the package, the BL model is separated into three main modules. These are statistical properties calculation, BL model calibration, and model sampling (i.e., simulation) modules.
+In the package, the BL model is separated into three main modules. These are statistical properties calculation, BL model fitting and sampling modules.
 
 The statistical properties calculation module processes the input rainfall data and calculates its standard statistical properties at given timescales. 
 
-The BL model calibration module conducts the model fitting based upon the re-derived BL equations given in Onof and Wang (2020). A numerical solver, based upon Dual Annealing optimization and Nelder-Mead local minimization techniques, is implemented to ensure efficiency as well as to prevent being drawn to local optima during the solving process.
+The BL model fitting module performs model fitting based upon the re-derived BL equations given in Onof and Wang (2020). A number of numerical solvers, such as Dual Annealing optimization and Nelder-Mead local minimization techniques, are implemented and provided. The combined use of these technoques can ensure efficiency as well as to prevent being drawn to local optima during the solving process.
 
-You may use the sampling module to generate a stochastic rainfall time series at a given timescale and for any required data length based upon a calibrated BL model.
+You may use the sampling module to generate a stochastic rainfall time series at given timescales and for any required data length based upon a fitted BL model.
 
-The design of this package is highly modularized, and the standard CSV data format is used for file exchange between modules. It is easily to incorporate given modules into your existing applications. 
+The design of this package is highly modularised, and the standard CSV data format is used for file exchange between modules. Users can easily incorporrate given modules into their existing applications. 
 
-In addition, a team consisting of researchers from National Taiwan University and Imperial College London will consistently implement the breakthroughs in the BL model to this package so that you will have access to the latest developments.
+In addition, a team consisting of researchers from National Taiwan University and Imperial College London will consistently implement the breakthroughs in the BL model to this package so that users would have access to the latest developments.
 
 ## Prerequisites
 | Library         | Version   | Website                                    | Reference                               | Description |
@@ -40,8 +40,8 @@ Clone this repo or enter the following texts in your command line.
 
 ## Getting Started
 
-1. modified the time scale in `timerange.csv`
-    * For the time scale code, please refer to the table
+1. Modify the timescales in `timerange.csv`
+    * For the timescale code, please refer to the table below
 
 
     | Second | Minute | Hour | Day | Month | Year |
