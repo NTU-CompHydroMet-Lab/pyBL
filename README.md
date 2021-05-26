@@ -67,7 +67,7 @@ You follow the procedure in `main.py` to understand the workflow of whole BL mod
 | sampling.sampling_utils |             |
 
 # Examples
-The following examples are stored in the example folder. (?)
+The following examples are stored in the example folder.
 
 ## Calculating Statistical Properties
 In the timeRange CSV file, you may specify statistical properties and time scales you would like to use. Available properties are Covariance, AR-1, and Skewness.
