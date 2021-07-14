@@ -66,6 +66,53 @@ You follow the procedure in `main.py` to understand the workflow of whole BL mod
 | sampling.merge          |             |
 | sampling.sampling_utils |             |
 
+# Examples
+The following examples are stored in the example folder.
+
+## Calculating Statistical Properties
+In the timeRange CSV file, you may specify statistical properties and time scales you would like to use. Available properties are Covariance, AR-1, and Skewness.
+
+The implementation of calculating statistical properties can be summarized as follows:
+
+0. Read raw data from a CSV file.
+1. Read specified statistical properties and time scales from the timeRange CSV file.
+2. Resample raw data to 1h data.
+3. Calculate mean 1h rain depth and its weight for each calendar month. 
+4. Calculate other properties and their weights for each calendar month for time scales specified in the timeRange CSV file.
+5. Output the statistical properties and their weights to a CSV file.
+
+### Example code
+example_CalStats.py
+
+## Fitting a Model
+This example takes in a CSV file of statistical properties and corresponding weights calculated from raw data. You may set initial theta in the YAML file.
+
+The implementation of fitting a model can be summarized as follows:
+
+0. Read statistical properties and corresponding weights from specified CSV files.
+1. Set initial theta.
+2. Initialize objective function.
+3. Initialize fitting model.
+4. Find approximate global optimum using Dual Annealing algorithm.
+5. Try to find a optimum local minimum using Nelder Mead algorithm.
+6. Output the result theta to a CSV file.
+
+### Example code
+example_Fitting.py
+
+## Sampling a Model
+This example takes in a CSV file of result theta and output sample statistical properties for different time scales.
+
+The implementation of calculating statistical properties can be summarized as follows:
+
+0. Read result theta file from a specified CSV file.
+1. Sample storms.
+2. Calculate statistical properties of the sampled rainfall time series.
+3. Output the statistical properties for each calendar month.
+
+### Example code
+example_Sampling.py
+
 ## Citation
 If you use pyBL in your research or wish to refer to the baseline results published in the Model Zoo, please use the following BibTeX entry.
 
