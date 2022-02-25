@@ -9,7 +9,7 @@ In the package, the BL model is separated into three main modules. These are sta
 
 The statistical properties calculation module processes the input rainfall data and calculates its standard statistical properties at given timescales. 
 
-The BL model fitting module performs model fitting based upon the re-derived BL equations given in Onof and Wang (2020). A number of numerical solvers, such as Dual Annealing optimization and Nelder-Mead local minimization techniques, are implemented and provided. The combined use of these technoques can ensure efficiency as well as to prevent being drawn to local optima during the solving process.
+The BL model fitting module performs model fitting based upon the re-derived BL equations given in Onof and Wang (2020). A number of numerical solvers, such as Dual Annealing optimization and Nelder-Mead local minimization techniques, are implemented and provided. The combined use of these techniques can ensure efficiency as well as to prevent being drawn to local optima during the solving process.
 
 You may use the sampling module to generate a stochastic rainfall time series at given timescales and for any required data length based upon a fitted BL model.
 
