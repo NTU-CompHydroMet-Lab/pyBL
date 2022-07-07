@@ -31,7 +31,7 @@ In addition, a team consisting of researchers from National Taiwan University an
 | pytz            | 2021.1    | https://github.com/stub42/pytz             | Bishop (2004)                           |             |
 | six             | 1.15.0    | https://six.readthedocs.io/                | Peterson (2010)                         |             |
 | zignor          | 0.1.8     | https://github.com/jameslao/zignor-python  | Lao (2015)                              |             |
-| matplolib       | 3.0.3     | https://matplotlib.org/                    | Hunter (2007)                           |             |
+| matplotlib       | 3.0.3     | https://matplotlib.org/                    | Hunter (2007)                           |             |
 
 
 ## Installation
