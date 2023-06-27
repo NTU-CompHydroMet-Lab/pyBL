@@ -56,7 +56,7 @@ for i in range(1, len(total_sample_sta_prop)):
     df2 = pd.DataFrame(total_sample_sta_prop[i])
     fin_df = pd.concat([df, df2])
     df = fin_df
-
+pd.DataFrame(fin_df).to_csv(args.IO.sample_stats_path)
 # %%
 
 
