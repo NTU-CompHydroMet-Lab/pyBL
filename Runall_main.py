@@ -210,6 +210,12 @@ for i in range(1, len(total_sample_sta_prop)):
     df2 = pd.DataFrame(total_sample_sta_prop[i])
     fin_df = pd.concat([df, df2])
     df = fin_df
+
+print('Sampling Finished')
+pd.DataFrame(fin_df).to_csv(args.IO.sample_stats_path)
+compare_plt('test',timeseries,fin_df, 'Skewness', ['1h', '3h', '6h', '1D'])
+compare_plt('test',timeseries,fin_df, 'CV', ['1h', '3h', '6h', '1D'])
+compare_plt('test',timeseries,fin_df, 'Mean', ['1h'])
 print('All tasks are done')
 # %%
 

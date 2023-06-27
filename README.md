@@ -40,7 +40,7 @@ Clone this repo or enter the following texts in your command line.
 
 ## Getting Started
 
-1. Modify the timescales in `timerange.csv`
+1. Modify the timescales in `./01 Input_data/timerange.csv`
     * For the timescale code, please refer to the table below
 
 
@@ -48,15 +48,17 @@ Clone this repo or enter the following texts in your command line.
     | ------ | ------ | ---- | --- | ----- | ---- |
     | S      | T      | H    | D   | M     | Y    |
 2. Select the statistical properties for your versions of BL model. 
-    * **Note** that the properties must be included in `utils.py` or you could directly add your stats prop calculation in `utils.py`.
-3. run `python3 main.py`
+    * **Note** that the properties must be included in `./Library/Cal_stats_lib/utils.py` or you could directly add your stats prop calculation in `./Library/Cal_stats_lib/utils.py`.
+3. run `python3 Runall_main.py`
 
-## In `main.py`
+## In `Runall_main.py`
 The whole main script could be divided into three steps which are calculating stats, fitting, and sampling.
-You follow the procedure in `main.py` to understand the workflow of whole BL model and the usage of each sub-module.
+You follow the procedure in `Runall_main.py` to understand the workflow of whole BL model and the usage of each sub-module.
 
 
 ## Module
+All the modules are in `Library`.
+
 | Module                  | Description |
 | ----------------------- | ----------- |
 | fitting                 |             |
@@ -66,11 +68,9 @@ You follow the procedure in `main.py` to understand the workflow of whole BL mod
 | sampling.merge          |             |
 | sampling.sampling_utils |             |
 
-# Examples
-The following examples are stored in the example folder.
 
 ## Calculating Statistical Properties
-In the timeRange CSV file, you may specify statistical properties and time scales you would like to use. Available properties are Covariance, AR-1, and Skewness.
+In the timeRange CSV file, you may specify statistical properties and time scales you would like to use. Available properties are Covariance coefficient, AR-1, and Skewness.
 
 The implementation of calculating statistical properties can be summarized as follows:
 
@@ -82,10 +82,14 @@ The implementation of calculating statistical properties can be summarized as fo
 5. Output the statistical properties and their weights to a CSV file.
 
 ### Example code
-example_CalStats.py
+`Runme01_ Cal_ stats.py`
+
+### Output
+1. `./02 Output/staProp_test.csv`
+2. `./02 Output/weight_test.csv`
 
 ## Fitting a Model
-This example takes in a CSV file of statistical properties and corresponding weights calculated from raw data. You may set initial theta in the YAML file.
+This example takes in a CSV file of statistical properties and corresponding weights calculated from raw data. You may set initial theta in `./config/defalt.yaml`.
 
 The implementation of fitting a model can be summarized as follows:
 
@@ -98,7 +102,9 @@ The implementation of fitting a model can be summarized as follows:
 6. Output the result theta to a CSV file.
 
 ### Example code
-example_Fitting.py
+`Runme02_Fitting.py`
+### Output
+`./02 Output/Theta.csv`
 
 ## Sampling a Model
 This example takes in a CSV file of result theta and output sample statistical properties for different time scales.
@@ -111,12 +117,12 @@ The implementation of calculating statistical properties can be summarized as fo
 3. Output the statistical properties for each calendar month.
 
 ### Example code
-example_Sampling.py
+`Runme03_Sampling.py`
+### Output
+`./02 Output/sample_stats.csv`
 
 ## Citation
 If you use pyBL in your research or wish to refer to the baseline results published in the Model Zoo, please use the following BibTeX entry.
-
-## Contact
 
 ## References
 1. G. Marsaglia and W.W. Tsang: The Ziggurat Method for Generating Random Variables. Journal of Statistical Software, vol. 5, no. 8, pp. 1–7, 2000.
