@@ -1,11 +1,11 @@
 IO:
-  config_path: './timeRange.csv'
-  raw_data_path: './data/test.csv'
-  stats_file_path: './data/staProp_test.csv'
-  weight_file_path: './data/weight_test.csv'
-  theta_store_path: './test_theta.csv'
+  config_path: './01 Input_data/timeRange.csv'
+  raw_data_path: './01 Input_data/test.csv'
+  stats_file_path: './02 Output_data/staProp_test.csv'
+  weight_file_path: './02 Output_data/weight_test.csv'
+  theta_store_path: './02 Output_data/test_theta.csv'
   store_sample_stats: true
-  sample_stats_path: './sample_stats.csv'
+  sample_stats_path: './02 Output_data/sample_stats.csv'
 fitting:
   theta_initial:
   path:
@@ -15,4 +15,4 @@ sampling:
   month: 1
   start_time: '2020-01-01'
   end_time: '2020-12-31'
-  freq: '5T'
+  freq: '1h'
