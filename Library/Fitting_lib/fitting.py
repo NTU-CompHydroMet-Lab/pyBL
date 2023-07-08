@@ -11,7 +11,10 @@ np.random.seed(1340)
 def scalesTransform(timeScaleList):
     b = []
     for i in timeScaleList:
-        if i[1] == 'T':
+        if i[1] == 'a':
+            a = np.nan
+            continue
+        elif i[1] == 'T':
             a = float(i[0])/60
         elif i[1] == 'h':
             a = int(i[0])
