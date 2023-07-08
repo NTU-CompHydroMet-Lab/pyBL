@@ -40,8 +40,8 @@ Clone this repo or enter the following texts in your command line.
 
 ## Getting Started
 
-1. Modify the timescales in `./01 Input_data/timerange.csv`
-    * For the timescale code, please refer to the table below
+1. Modify the timescales in `./01 Input_data/timerange.csv`. We need at least 4 different timescales for fitting. For 5 min rainfall time series the combination of 5T,1h,6h,1D is recommended. As for 1 hour rainfall time series 1h,3h,6h,1D should be used. Both combinations are based on experiments thus kindly remind you not to change them whatever you want. If less than 4 timescales are used, please replace the empty with 'NaN'. The same combination with some of the timescales missing is acceptable for model running, however, the missing may affect the performance of model fitting.
+    * For the timescale code, please refer to the table below.
 
 
     | Second | Minute | Hour | Day | Month | Year |
