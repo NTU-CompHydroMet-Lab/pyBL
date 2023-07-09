@@ -212,10 +212,7 @@ for i in range(1, len(total_sample_sta_prop)):
     df = fin_df
 
 print('Sampling Finished')
-pd.DataFrame(fin_df).to_csv(args.IO.sample_stats_path)
-compare_plt('test',timeseries,fin_df, 'Skewness', ['1h', '3h', '6h', '1D'])
-compare_plt('test',timeseries,fin_df, 'CV', ['1h', '3h', '6h', '1D'])
-compare_plt('test',timeseries,fin_df, 'Mean', ['1h'])
+fin_df.to_csv(args.IO.sample_stats_path)
 print('All tasks are done')
 # %%
 
