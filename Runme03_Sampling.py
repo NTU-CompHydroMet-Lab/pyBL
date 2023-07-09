@@ -1,7 +1,3 @@
-# %%
-#resample will compensate all empty timestemp
-#1h 3h 6h 24h if ih sample 5T
-
 from dotmap import DotMap
 from Library.BLRPRmodel.BLRPRx import *
 from calendar import month_abbr
