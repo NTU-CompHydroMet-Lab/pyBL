@@ -13,6 +13,9 @@ def Exponential_func(x, *args):
     model = args[4]
     M_state_h = Cal(x, timeScaleList, model)
     S = 0.0
+    
+    data = [i for i in data if type(i) == np.float64]
+    weight = [i for i in weight if type(i) == np.float64]
 
     # Mean_60,CV_5,AR-1_5,Skewness_5,CV_60,AR-1_60,Skewness_60,CV_360,AR-1_360,Skewness_360,CV_1440,AR-1_1440,Skewness_1440
 
@@ -27,6 +30,10 @@ def Exponential_func(x, month, timeScaleList, data, weight, model):
     month = month
     M_state_h = Cal(x, timeScaleList, model)
     S = 0.0
+    
+    data = [i for i in data if type(i) == np.float64]
+    weight = [i for i in weight if type(i) == np.float64]
+    
     # Mean_60,CV_5,AR-1_5,Skewness_5,CV_60,AR-1_60,Skewness_60,CV_360,AR-1_360,Skewness_360,CV_1440,AR-1_1440,Skewness_1440
     for sin_x, compare_x, W in zip(M_state_h, data, weight):
         # print('sin_x = {}, compare_x = {}, W = {}'.format(sin_x, compare_x, W))
