@@ -1,6 +1,5 @@
 from .utils import *
 import pandas as pd
-from tqdm.notebook import tqdm
 
 def createStatisticalFile(rawData, propertyList, timeScaleList, meanTimeScale, outputMean, outputPath, weightFile_path, pDryThreshold=0):
     month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
