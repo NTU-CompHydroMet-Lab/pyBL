@@ -1,6 +1,6 @@
 import pandas as pd
 from dotmap import DotMap
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import yaml
 import numpy as np
 from PIL import Image
