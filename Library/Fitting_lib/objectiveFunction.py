@@ -1,7 +1,9 @@
+import math
+
 import numpy as np
 import pandas as pd
+
 from Library.BLRPRmodel.BLRPRx import *
-import math
 
 
 def Exponential_func(x, *args):
@@ -27,7 +29,7 @@ def Exponential_func(x, month, timeScaleList, data, weight, model):
     month = month
     M_state_h = Cal(x, timeScaleList, model)
     S = 0.0
-    
+
     # Mean_60,CV_5,AR-1_5,Skewness_5,CV_60,AR-1_60,Skewness_60,CV_360,AR-1_360,Skewness_360,CV_1440,AR-1_1440,Skewness_1440
     for sin_x, compare_x, W in zip(M_state_h, data, weight):
         # print('sin_x = {}, compare_x = {}, W = {}'.format(sin_x, compare_x, W))
@@ -37,14 +39,14 @@ def Exponential_func(x, month, timeScaleList, data, weight, model):
 
 
 def Cal(x, timeScaleList, model):
-    _Props = ['CVAR', 'AR1', 'SKEWNESS']
+    _Props = ["CVAR", "AR1", "SKEWNESS"]
     M_state_h = []
 
-    x[2] = 1.0 #  sigma/mu
-    x[3] = 1e-6 #  spare space
+    x[2] = 1.0  #  sigma/mu
+    x[3] = 1e-6  #  spare space
     x[-1] = 1.0
     theta = np.insert(x, 0, 1)
-    M_state_h.append(Get_Props('MEAN', theta, model))
+    M_state_h.append(Get_Props("MEAN", theta, model))
     for p in timeScaleList:
         for prop in _Props:
             theta = np.insert(x, 0, p)
@@ -54,28 +56,28 @@ def Cal(x, timeScaleList, model):
 
 def Get_Props(Prop, theta, model):
     m_stat = -9999.0
-    if Prop == 'MEAN':
+    if Prop == "MEAN":
         m_stat = model.Mean(theta)
-    elif Prop == 'VAR':
+    elif Prop == "VAR":
         m_stat = model.Var(theta)
-    elif Prop == 'CVAR':
+    elif Prop == "CVAR":
         m_stat = math.sqrt(model.Var(theta)) / model.Mean(theta)
-    elif Prop == 'AR1':
+    elif Prop == "AR1":
         m_stat = model.Cov(theta, 1) / model.Var(theta)
-    elif Prop == 'AR2':
+    elif Prop == "AR2":
         m_stat = model.Cov(theta, 2) / model.Var(theta)
-    elif Prop == 'AR3':
+    elif Prop == "AR3":
         m_stat = model.Cov(theta, 3) / model.Var(theta)
-    elif Prop == 'AC1':
+    elif Prop == "AC1":
         m_stat = model.Cov(theta, 1)
-    elif Prop == 'AC2':
+    elif Prop == "AC2":
         m_stat = model.Cov(theta, 2)
-    elif Prop == 'AC3':
+    elif Prop == "AC3":
         m_stat = model.Cov(theta, 3)
-    elif Prop == 'SKEWNESS':
+    elif Prop == "SKEWNESS":
         stdev3 = model.Var(theta) * math.sqrt(model.Var(theta))
         m_stat = model.Mom3(theta) / stdev3
-    elif Prop == 'pDRY':
+    elif Prop == "pDRY":
         m_stat = model.Ph(theta)
     else:
         m_stat = -9999.0

@@ -1,23 +1,36 @@
-import numpy as np
-import pandas as pd
+import datetime
 import math
-import yaml
-from dotmap import DotMap
 from datetime import datetime as dt
 from datetime import timedelta as td
-import datetime
+
+import numpy as np
+import pandas as pd
+import yaml
+from dotmap import DotMap
+
 
 def MergeCells(storms, freq):
     min_time = np.min(np.array([storm.sDT for storm in storms])).replace(microsecond=0)
-    max_time = np.max(np.array([cell.eDT for storm in storms for cell in storm.cells])).replace(microsecond=0)
-    args = yaml.load(open('./config/default.yaml'), Loader=yaml.FullLoader)
+    max_time = np.max(
+        np.array([cell.eDT for storm in storms for cell in storm.cells])
+    ).replace(microsecond=0)
+    args = yaml.load(open("./config/default.yaml"), Loader=yaml.FullLoader)
     args = DotMap(args)
     end_time = args.sampling.end_time
-    max_time = np.max(np.array([cell.eDT for storm in storms for cell in storm.cells if cell.eDT < dt.strptime(end_time, '%Y-%m-%d') + td(days = 30)])).replace(microsecond=0)
-    
+    max_time = np.max(
+        np.array(
+            [
+                cell.eDT
+                for storm in storms
+                for cell in storm.cells
+                if cell.eDT < dt.strptime(end_time, "%Y-%m-%d") + td(days=30)
+            ]
+        )
+    ).replace(microsecond=0)
+
     whole_duration = max_time - min_time
     blanks = int(whole_duration.total_seconds())
-    ts = np.zeros((blanks+1))
+    ts = np.zeros((blanks + 1))
 
     for storm in storms:
         for cell in storm.cells:
@@ -27,6 +40,6 @@ def MergeCells(storms, freq):
             ts[s:e] += real_depth_per_second
     ind_time = min_time
 
-    time_index = pd.date_range(min_time, max_time, freq='S')
+    time_index = pd.date_range(min_time, max_time, freq="S")
     rainfall_ts = pd.Series(ts, index=time_index).resample(freq).sum()
     return rainfall_ts

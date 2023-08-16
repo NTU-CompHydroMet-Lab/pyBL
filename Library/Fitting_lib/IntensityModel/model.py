@@ -17,11 +17,11 @@ class root_RCI_model(ABC):
 
 class gamma_RCI_model(root_RCI_model):
     def get_f1(self, a):
-        return ((a + 1.0) / a)
+        return (a + 1.0) / a
 
     def get_f2(self, a):
         a2 = a * a
-        return ((a2 + 3.0 * a + 2.0) / a2)
+        return (a2 + 3.0 * a + 2.0) / a2
 
     def sample_intensity(para_ins):
         """

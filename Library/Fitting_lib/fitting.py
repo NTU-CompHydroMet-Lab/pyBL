@@ -1,45 +1,63 @@
-from scipy.optimize import dual_annealing, minimize, shgo, basinhopping, differential_evolution
+import math
 import random
+
 import numpy as np
 import pandas as pd
-import math
 import scipy.special as sc
+from scipy.optimize import (basinhopping, differential_evolution,
+                            dual_annealing, minimize, shgo)
+
 from Library.BLRPRmodel.BLRPRx import *
 
 np.random.seed(1340)
 
+
 def scalesTransform(timeScaleList):
     b = []
     for i in timeScaleList:
-        if i[1] == 'a':
+        if i[1] == "a":
             a = np.nan
             continue
-        elif i[1] == 'T':
-            a = float(i[0])/60
-        elif i[1] == 'h':
+        elif i[1] == "T":
+            a = float(i[0]) / 60
+        elif i[1] == "h":
             a = int(i[0])
-        elif i[1] == 'D':
-            a = int(i[0])*24
-        elif i[1] == 'M':
-            a = int(i[0])*30*24
-        elif i[1] == 'Y':
-            a = int(i[0])*365*24
-        else: a = i[0]
+        elif i[1] == "D":
+            a = int(i[0]) * 24
+        elif i[1] == "M":
+            a = int(i[0]) * 30 * 24
+        elif i[1] == "Y":
+            a = int(i[0]) * 365 * 24
+        else:
+            a = i[0]
         b.append(float(a))
     return b
 
+
 def drop_prop(df, month, timeScaleFile, Pdrop):
-    timeScaleList = timeScaleFile.loc['time'].dropna().to_numpy()
-    p = timeScaleFile.loc['prop'].dropna().tolist()
+    timeScaleList = timeScaleFile.loc["time"].dropna().to_numpy()
+    p = timeScaleFile.loc["prop"].dropna().tolist()
     if Pdrop in p:
-        dr = [str(Pdrop) + '_' + i for i in timeScaleList]
+        dr = [str(Pdrop) + "_" + i for i in timeScaleList]
         data = df.iloc[month]
         data_fin = data.drop(dr)
-    else: print(f'There is no property {Pdrop} in the dataset! Please choose one from the property list.')
+    else:
+        print(
+            f"There is no property {Pdrop} in the dataset! Please choose one from the property list."
+        )
     return data_fin.to_numpy()
 
 
-def Annealing(theta, obj_func, fitting_model, month, timeScaleList, staFile_path, weightFile_path, timescaleFile_path):
+def Annealing(
+    theta,
+    obj_func,
+    fitting_model,
+    month,
+    timeScaleList,
+    staFile_path,
+    weightFile_path,
+    timescaleFile_path,
+):
     r"""
     Optimize the theta, the parameter of BL model by dual annealing which is a global optimization method provided by scipy
     :param theta: list, a list of parameters
@@ -65,22 +83,29 @@ def Annealing(theta, obj_func, fitting_model, month, timeScaleList, staFile_path
     df = pd.read_csv(staFile_path, index_col=0, header=0)
     Wdf = pd.read_csv(weightFile_path, index_col=0, header=0)
     timescaleFile = pd.read_csv(timescaleFile_path, index_col=0, header=None)
-    data = drop_prop(df, month-1, timescaleFile, 'pDry')
-    weight = drop_prop(Wdf, month-1, timescaleFile, 'pDry')
-#     print(f'TimeScaleList : {timeScaleList}')
-#     print(f'Theta : {theta}')
-#     print(f'Data : {data}')
-#     print(f'Weight : {weight}')
-    
-    ret = dual_annealing(obj_func, bounds=list(zip(lw, up)), x0=theta, maxiter=5000,
-                         args=[month-1, timeScaleList, data, weight, fitting_model])
+    data = drop_prop(df, month - 1, timescaleFile, "pDry")
+    weight = drop_prop(Wdf, month - 1, timescaleFile, "pDry")
+    #     print(f'TimeScaleList : {timeScaleList}')
+    #     print(f'Theta : {theta}')
+    #     print(f'Data : {data}')
+    #     print(f'Weight : {weight}')
+
+    ret = dual_annealing(
+        obj_func,
+        bounds=list(zip(lw, up)),
+        x0=theta,
+        maxiter=5000,
+        args=[month - 1, timeScaleList, data, weight, fitting_model],
+    )
 
     theta = ret.x
-    #print("The fval of Annealing = {}".format(ret.fun))
+    # print("The fval of Annealing = {}".format(ret.fun))
     return theta, ret.fun
 
 
-def Differential_evolution(theta, obj_func, fitting_model, month, timeScaleList, staFile_path, weightFile_path):
+def Differential_evolution(
+    theta, obj_func, fitting_model, month, timeScaleList, staFile_path, weightFile_path
+):
     r"""
     Optimize the theta, the parameter of BL model by differential evolution which is a global optimization method provided by scipy
     :param theta: list, a list of parameters
@@ -105,19 +130,35 @@ def Differential_evolution(theta, obj_func, fitting_model, month, timeScaleList,
     df = pd.read_csv(staFile_path, index_col=0, header=0)
     Wdf = pd.read_csv(weightFile_path, index_col=0, header=0)
     timescaleFile = pd.read_csv(timescaleFile_path, index_col=0, header=None)
-    data = drop_prop(df, month-1, timescaleFile, 'pDry')
-    weight = drop_prop(Wdf, month-1, timescaleFile, 'pDry')
-    
-    ret = differential_evolution(obj_func,  bounds=list(zip(lw, up)), args=(month-1, timeScaleList, data, weight, fitting_model),
-                                 strategy='best1bin', maxiter=5000, disp=True, tol=1e-6)
+    data = drop_prop(df, month - 1, timescaleFile, "pDry")
+    weight = drop_prop(Wdf, month - 1, timescaleFile, "pDry")
+
+    ret = differential_evolution(
+        obj_func,
+        bounds=list(zip(lw, up)),
+        args=(month - 1, timeScaleList, data, weight, fitting_model),
+        strategy="best1bin",
+        maxiter=5000,
+        disp=True,
+        tol=1e-6,
+    )
 
     theta = ret.x
-    
+
     print("The fval of Differential_evolution = {}".format(ret.fun))
     return theta
 
 
-def Basinhopping(theta, obj_func, fitting_model, month, timeScaleList, staFile_path, weightFile_path, timescaleFile_path):
+def Basinhopping(
+    theta,
+    obj_func,
+    fitting_model,
+    month,
+    timeScaleList,
+    staFile_path,
+    weightFile_path,
+    timescaleFile_path,
+):
     r"""
     Optimize the theta, the parameter of BL model by basinhopping which is a global optimization method provided by scipy
     :param theta: list, a list of parameters
@@ -143,12 +184,18 @@ def Basinhopping(theta, obj_func, fitting_model, month, timeScaleList, staFile_p
     df = pd.read_csv(staFile_path, index_col=0, header=0)
     Wdf = pd.read_csv(weightFile_path, index_col=0, header=0)
     timescaleFile = pd.read_csv(timescaleFile_path, index_col=0, header=None)
-    data = drop_prop(df, month-1, timescaleFile, 'pDry')
-    weight = drop_prop(Wdf, month-1, timescaleFile, 'pDry')
-    
-    ret = basinhopping(obj_func, theta,  niter=250,
-                       minimizer_kwargs={'args': (month-1, timeScaleList, data, weight, fitting_model),
-                                         'bounds': list(zip(lw, up))})
+    data = drop_prop(df, month - 1, timescaleFile, "pDry")
+    weight = drop_prop(Wdf, month - 1, timescaleFile, "pDry")
+
+    ret = basinhopping(
+        obj_func,
+        theta,
+        niter=250,
+        minimizer_kwargs={
+            "args": (month - 1, timeScaleList, data, weight, fitting_model),
+            "bounds": list(zip(lw, up)),
+        },
+    )
     theta = ret.x
     print("The fval of Basinhopping = {}".format(ret.fun))
     return theta, ret.fun
@@ -179,11 +226,15 @@ def Shgo(theta, obj_func, month, timeScaleList, staFile_path, weightFile_path):
     df = pd.read_csv(staFile_path, index_col=0, header=0)
     Wdf = pd.read_csv(weightFile_path, index_col=0, header=0)
     timescaleFile = pd.read_csv(timescaleFile_path, index_col=0, header=None)
-    data = drop_prop(df, month-1, timescaleFile, 'pDry')
-    weight = drop_prop(Wdf, month-1, timescaleFile, 'pDry')
+    data = drop_prop(df, month - 1, timescaleFile, "pDry")
+    weight = drop_prop(Wdf, month - 1, timescaleFile, "pDry")
 
-    ret = shgo(obj_func, bounds=list(zip(lw, up)), iters=3,
-               args=[month-1, timeScaleList, data, weight])
+    ret = shgo(
+        obj_func,
+        bounds=list(zip(lw, up)),
+        iters=3,
+        args=[month - 1, timeScaleList, data, weight],
+    )
     theta = ret.x
     # print(ret.message)
     print("The fval of shgo = {}".format(ret.fun))
@@ -191,7 +242,16 @@ def Shgo(theta, obj_func, month, timeScaleList, staFile_path, weightFile_path):
     return theta
 
 
-def Nelder_Mead(theta, obj_func, fitting_model, month, timeScaleList, staFile_path, weightFile_path, timescaleFile_path):
+def Nelder_Mead(
+    theta,
+    obj_func,
+    fitting_model,
+    month,
+    timeScaleList,
+    staFile_path,
+    weightFile_path,
+    timescaleFile_path,
+):
     r"""
     Optimize the theta, the parameter of BL model by local minimization optimization methods provided by scipy
     :param theta: list, a list of parameters
@@ -214,25 +274,36 @@ def Nelder_Mead(theta, obj_func, fitting_model, month, timeScaleList, staFile_pa
     Wdf = pd.read_csv(weightFile_path, index_col=0, header=0)
 
     timescaleFile = pd.read_csv(timescaleFile_path, index_col=0, header=None)
-    data = drop_prop(df, month-1, timescaleFile, 'pDry')
-    weight = drop_prop(Wdf, month-1, timescaleFile, 'pDry')
+    data = drop_prop(df, month - 1, timescaleFile, "pDry")
+    weight = drop_prop(Wdf, month - 1, timescaleFile, "pDry")
 
-    method_list = ['L-BFGS-B', 'TNC', 'SLSQP',
-                   'Powell', 'trust-constr']  # 'Nelder-Mead',
+    method_list = [
+        "L-BFGS-B",
+        "TNC",
+        "SLSQP",
+        "Powell",
+        "trust-constr",
+    ]  # 'Nelder-Mead',
     score_list = []
     result_list = []
     for method in method_list:
-        res = minimize(obj_func, theta, method=method,  bounds=list(zip(lw, up)),
-                       args=(month-1, timeScaleList, data, weight, fitting_model), 
-                       options={'disp': False, 'maxiter': 5000})
+        res = minimize(
+            obj_func,
+            theta,
+            method=method,
+            bounds=list(zip(lw, up)),
+            args=(month - 1, timeScaleList, data, weight, fitting_model),
+            options={"disp": False, "maxiter": 5000},
+        )
 
         score_list.append(res.fun)
         result_list.append(res.x)
 
     min_index = score_list.index(min(score_list))
-    print('The best method is {}'.format(method_list[min_index]))
+    print("The best method is {}".format(method_list[min_index]))
     print("The fval of local minimum = {}".format(score_list[min_index]))
     return result_list[min_index], score_list[min_index]
+
 
 # def PSO( theta, obj_func, month, timeScaleList):
 #     if obj_func == None:
