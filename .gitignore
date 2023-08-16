@@ -5,5 +5,4 @@ C++Version/
 __pycache__/
 *.log
 testCal.py
-Theta.csv
 result/*
