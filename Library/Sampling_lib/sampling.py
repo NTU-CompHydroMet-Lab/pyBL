@@ -55,16 +55,9 @@ def SampleStorm(thetas, sDT_sim_hr, duration_sim_hr):
     print("%d samples of storms are generated. \n" % n_storms)
     
     storms = list()
-    
-    etas_spill = rng_seed.gamma(alpha, scale=1.0/nu, size = n_storms+1000)
-
-    filt = [i for i in etas_spill if stats.gamma.cdf(i, a = alpha, loc = 0, scale = 1/nu) < 0.99 and stats.gamma.cdf(i, a = alpha, loc = 0, scale = 1/nu) > 0.01]
-    random.shuffle(filt)
-    etas = filt[:n_storms+1]
-    
+        
     # single storm simulation
     for s in range(n_storms):
-        
         # cell duration parameter
         # eta = etas[s]
         eta = gamma(alpha, 1.0/nu)

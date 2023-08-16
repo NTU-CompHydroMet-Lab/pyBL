@@ -174,69 +174,6 @@ class BLRPRx():
 
         return the_lambda*muc*iota*iota*(cov_p1 - cov_p2)
 
-    def Cov2(self, theta, eta0=0.001, lag=1):
-        the_lambda = theta[1]
-        iota = theta[2]
-        alpha = theta[5]
-        nu = alpha / theta[6]
-        kappa = theta[7]
-        phi = theta[8]
-        c = theta[9]
-        h = theta[0]
-        muc = 1.0 + kappa / phi
-
-        phi2 = phi*phi
-        phi3 = phi*phi2
-
-        r = theta[3]
-        f1 = self.RCI_model.get_f1(r)
-
-        s = alpha - 1
-        x0 = (nu + phi*(lag - 1.0)*h)
-        x = eta0 * x0
-        upper_cov_c1 = sc.gammaincc(s, x) * sc.gamma(s) * math.pow(
-            nu, alpha) / gsl_sf_gamma(alpha) / math.pow(x0, alpha-1.0)
-        x0 = (nu + (lag - 1.0)*h)
-        x = eta0 * x0
-        upper_cov_c1_phi_1 = sc.gammaincc(
-            s, x) * sc.gamma(s)*math.pow(nu, alpha) / gsl_sf_gamma(alpha) / math.pow(x0, alpha - 1.0)
-
-        x0 = (nu + phi*lag*h)
-        x = eta0 * x0
-        upper_cov_c2 = -2.0 * sc.gammaincc(s, x) * sc.gamma(s)*math.pow(
-            nu, alpha) / gsl_sf_gamma(alpha) / math.pow(x0, alpha - 1.0)
-        x0 = (nu + lag*h)
-        x = eta0 * x0
-        upper_cov_c2_phi_1 = -2.0 * sc.gammaincc(s, x) * sc.gamma(s)*math.pow(
-            nu, alpha) / gsl_sf_gamma(alpha) / math.pow(x0, alpha - 1.0)
-
-        x0 = (nu + phi*(lag + 1.0)*h)
-        x = eta0 * x0
-        upper_cov_c3 = sc.gammaincc(
-            s, x) * sc.gamma(s)*math.pow(nu, alpha) / gsl_sf_gamma(alpha) / math.pow(x0, alpha - 1.0)
-        x0 = (nu + (lag + 1.0)*h)
-        x = eta0 * x0
-        upper_cov_c3_phi_1 = sc.gammaincc(
-            s, x)*sc.gamma(s) * math.pow(nu, alpha) / gsl_sf_gamma(alpha) / math.pow(x0, alpha - 1.0)
-
-        # sl_sf_gamma_inc_P
-        s = alpha + 1.0
-        x = eta0*nu
-        lower_cov = sc.gammainc(s, x)*math.gamma(alpha + 1.0) * \
-            phi2*h*h / nu / math.gamma(alpha)
-        lower_cov_phi_1 = sc.gammainc(
-            s, x)*math.gamma(alpha + 1.0)*h*h / nu / math.gamma(alpha)
-
-        # /*std::cout << upper_cov_c1_phi_1 + upper_cov_c2_phi_1 + upper_cov_c3_phi_1 + lower_cov_phi_1
-        #     << ' ' << upper_cov_c1 + upper_cov_c2 + upper_cov_c3 + lower_cov << std::endl*/
-
-        # cout << lower_cov_phi_1 << ' ' << lower_cov << endl
-
-        return the_lambda*muc*iota*iota*(
-            (f1+(kappa*phi/(phi2-1.0)))*(upper_cov_c1_phi_1 +
-                                         upper_cov_c2_phi_1 + upper_cov_c3_phi_1 + lower_cov_phi_1)
-            - ((kappa/phi2/(phi2-1.0))*(upper_cov_c1 + upper_cov_c2 + upper_cov_c3 + lower_cov)))
-
     def Mom3(self, theta):
         the_lambda = theta[1]
         iota = theta[2]
