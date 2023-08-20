@@ -103,52 +103,6 @@ def Annealing(
     return theta, ret.fun
 
 
-def Differential_evolution(
-    theta, obj_func, fitting_model, month, timeScaleList, staFile_path, weightFile_path
-):
-    r"""
-    Optimize the theta, the parameter of BL model by differential evolution which is a global optimization method provided by scipy
-    :param theta: list, a list of parameters
-    :param obj_func: function method, the model equation
-    :param month: int, the index to assign the stats properties from stats file and weight file
-    :param timeScaleList: list, a list contains different ratio based on "1 Hour = 1" to fulfill the parameters
-    :param staFile_path: string, the file path of the statistical properties
-    :param weightFile_path: string, the file path of the weight(uncertainty) of the statistical properties
-    :return theta: list, the optimized theta parameters
-    """
-    if obj_func == None:
-        return -9999
-
-    n_theta = len(theta)
-
-    xp0 = [item for item in theta if item >= 0]
-    r = random.random()
-
-    lw = [1e-6] * n_theta
-    up = [20] * n_theta
-
-    df = pd.read_csv(staFile_path, index_col=0, header=0)
-    Wdf = pd.read_csv(weightFile_path, index_col=0, header=0)
-    timescaleFile = pd.read_csv(timescaleFile_path, index_col=0, header=None)
-    data = drop_prop(df, month - 1, timescaleFile, "pDry")
-    weight = drop_prop(Wdf, month - 1, timescaleFile, "pDry")
-
-    ret = differential_evolution(
-        obj_func,
-        bounds=list(zip(lw, up)),
-        args=(month - 1, timeScaleList, data, weight, fitting_model),
-        strategy="best1bin",
-        maxiter=5000,
-        disp=True,
-        tol=1e-6,
-    )
-
-    theta = ret.x
-
-    print("The fval of Differential_evolution = {}".format(ret.fun))
-    return theta
-
-
 def Basinhopping(
     theta,
     obj_func,
@@ -199,47 +153,6 @@ def Basinhopping(
     theta = ret.x
     print("The fval of Basinhopping = {}".format(ret.fun))
     return theta, ret.fun
-
-
-def Shgo(theta, obj_func, month, timeScaleList, staFile_path, weightFile_path):
-    r"""
-    Adopt shgo, a global optimization method for optimize the theta of the BL model.
-    :param theta: list, a list of parameters
-    :param obj_func: function method, the model equation
-    :param month: int, the index to assign the stats properties from stats file and weight file
-    :param timeScaleList: list, a list contains different ratio based on "1 Hour = 1" to fulfill the parameters
-    :param staFile_path: string, the file path of the statistical properties
-    :param weightFile_path: string, the file path of the weight(uncertainty) of the statistical properties
-    :return theta: list, the optimized theta
-    """
-    if obj_func == None:
-        return -9999
-
-    n_theta = len(theta)
-
-    xp0 = [item for item in theta if item >= 0]
-    r = random.random()
-
-    lw = [1e-6] * n_theta
-    up = [20] * n_theta
-
-    df = pd.read_csv(staFile_path, index_col=0, header=0)
-    Wdf = pd.read_csv(weightFile_path, index_col=0, header=0)
-    timescaleFile = pd.read_csv(timescaleFile_path, index_col=0, header=None)
-    data = drop_prop(df, month - 1, timescaleFile, "pDry")
-    weight = drop_prop(Wdf, month - 1, timescaleFile, "pDry")
-
-    ret = shgo(
-        obj_func,
-        bounds=list(zip(lw, up)),
-        iters=3,
-        args=[month - 1, timeScaleList, data, weight],
-    )
-    theta = ret.x
-    # print(ret.message)
-    print("The fval of shgo = {}".format(ret.fun))
-
-    return theta
 
 
 def Nelder_Mead(
@@ -304,36 +217,3 @@ def Nelder_Mead(
     print("The fval of local minimum = {}".format(score_list[min_index]))
     return result_list[min_index], score_list[min_index]
 
-
-# def PSO( theta, obj_func, month, timeScaleList):
-#     if obj_func == None:
-#         return -9999
-#     n_particles = 1000
-#     n_theta = len(theta)
-#     lw = np.zeros(9)
-#     up = 20 * np.ones(9)
-#     bounds = (lw, up)
-#     xp0 =  np.array([[item for item in theta if item >= 0]])
-#     init_pos = np.zeros((n_particles, xp0.shape[1]))
-#     for row in range(n_particles):
-#         init_pos[row, :] = xp0 + np.random.rand(1,9)
-#     #global search part
-#     # options = {'c1': 0.5, 'c2': 0.3, 'w':0.9}
-#     # optimizer = ps.single.GlobalBestPSO(
-#     #     n_particles=n_particles,
-#     #     dimensions=9,
-#     #     init_pos = init_pos,
-#     #     options=options,
-#     #     bounds=bounds
-#     # )
-#     # cost, global_res = optimizer.optimize(obj_func, iters=10000, month = month-1 )
-#     # #transfer the global position to the start point of the local search
-#     # global_pos = np.zeros((n_particles, xp0.shape[1]))
-#     # for row in range(n_particles):
-#     #     init_pos[row, :] = global_res + np.random.rand(1,9)
-#     #local search part
-#     options = {'c1': 0.5, 'c2': 0.3, 'w':0.9, 'k': 3, 'p': 2}
-#     optimizer = ps.single.LocalBestPSO(n_particles=n_particles, dimensions=9,
-#         init_pos = init_pos, options=options, bounds=bounds)
-#     cost, local_pos = optimizer.optimize(obj_func, 10000, month = month-1, timeScaleList = timeScaleList)
-#     return local_pos

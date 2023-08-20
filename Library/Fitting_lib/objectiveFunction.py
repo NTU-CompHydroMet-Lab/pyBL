@@ -6,24 +6,6 @@ import pandas as pd
 from Library.BLRPRmodel.BLRPRx import *
 
 
-def Exponential_func(x, *args):
-    # print("inital x =  {}".format(x))
-    month = args[0]
-    timeScaleList = args[1]
-    data = args[2]
-    weight = args[3]
-    model = args[4]
-    M_state_h = Cal(x, timeScaleList, model)
-    S = 0.0
-
-    # Mean_60,CV_5,AR-1_5,Skewness_5,CV_60,AR-1_60,Skewness_60,CV_360,AR-1_360,Skewness_360,CV_1440,AR-1_1440,Skewness_1440
-
-    for sin_x, compare_x, W in zip(M_state_h, data, weight):
-        dt = sin_x - compare_x
-        S += W * dt * dt
-    return S
-
-
 def Exponential_func(x, month, timeScaleList, data, weight, model):
     # print("inital x =  {}".format(x))
     month = month
