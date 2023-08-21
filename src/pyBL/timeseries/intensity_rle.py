@@ -63,33 +63,35 @@ class IntensityRLE:
                 [0, 0], dtype=np.float64
             )
             return
+        else:
+            time = np.array(time, dtype=np.float64)
+            intensity = np.array(intensity, dtype=np.float64)
 
         # Check if time and intensity have the same length
-        if len(time) != len(intensity):
+        if time.size != intensity.size:
             raise ValueError("time and intensity must have the same length")
-
-        # Check if the RLE time is monotonically increasing.
-        if np.any(np.diff(time) <= 0):
-            raise ValueError("time must be monotonically increasing")
-
-        # Turn time and intensity into numpy arrays
-        self._time = np.array(time, dtype=np.float64)
-        self._intensity = np.array(intensity, dtype=np.float64)
-
         # Check if time and intensity are 1D arrays
-        if self._time.ndim != 1 or self._intensity.ndim != 1:
+        if time.ndim != 1 or intensity.ndim != 1:
             raise ValueError("time and intensity must be 1D arrays")
+        # Check if the RLE time is monotonically increasing.
+        if np.any(np.diff(time) < 0):
+            raise ValueError("time must be monotonically increasing")
+        # Check if last intensity is 0
+        if intensity[-1] != 0:
+            raise ValueError("Last intensity must be 0")
+
+        self._time = time
+        self._intensity = intensity
 
         # Check if _time have leading and trailing infinities.
-        # We've already checked that time and intensity have the same length,
-        # so if _time didn't have leading and trailing infinities,
-        # then we can just insert them both into _time and _intensity.
         if self._time[0] != -np.inf:
             self._time = np.insert(self._time, 0, -np.inf)
             self._intensity = np.insert(self._intensity, 0, 0)
         if self._time[-1] != np.inf:
             self._time = np.append(self._time, np.inf)
             self._intensity = np.append(self._intensity, 0)
+
+
 
     @classmethod
     def fromCells(
@@ -155,11 +157,11 @@ class IntensityRLE:
 
     @property
     def time(self) -> npt.NDArray[np.float64]:
-        return self._time[1:-1]
+        return self._time[1: -1]
 
     @property
     def intensity(self) -> npt.NDArray[np.float64]:
-        return self._intensity[1:-1]
+        return self._intensity[1: -1]
 
     def add(self, cell: Cell) -> None:
         if cell.startTime >= cell.endTime:

@@ -6,8 +6,8 @@ from datetime import timedelta
 
 @dataclass(frozen=True)
 class Cell:
-    startTime: int
-    endTime: int
+    startTime: float
+    endTime: float
     intensity: float
     timescale: timedelta = timedelta(hours=1)
 
