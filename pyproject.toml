@@ -6,7 +6,7 @@ authors = [
     {name = "Wei Chi Ling", email = "kilinw1998@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.8.0"
+requires-python = ">=3.6.0"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
