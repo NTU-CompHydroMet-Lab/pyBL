@@ -6,7 +6,7 @@ authors = [
     {name = "Wei Chi Ling", email = "kilinw1998@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.6.0"
+requires-python = ">=3.8.0"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -18,16 +18,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "pytest-cov",
-    "ruff",
-    "black",
-    "mypy",
-    "tox",
-    "pre-commit",
+    "pytest>=6.0.0",
+    "pytest-cov>=2.0.0",
+    "mypy>=0.910",
+    "tox>=3.20.0",
+    "pre-commit>=2.9.0",
 ]
 
 [tool.pytest.ini_options]
+# Generate report for codecov. Need to install pytest-cov.
 addopts = ["--cov=pyBL"]
 testpaths = ["tests"]
 
