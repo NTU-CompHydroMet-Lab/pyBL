@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import (
     Any,
     Callable,
-    Dict,
+    List,
     Optional,
+    Tuple,
     Type,
     TypeVar,
     Union,
@@ -17,7 +18,8 @@ import numpy.typing as npt
 from ..raincell.cell import Cell, ConstantCell
 
 CType = TypeVar("CType", bound=Cell[Any])
-CDelta = Callable[[CType], list[tuple[float, float]]]
+CDelta = Callable[[CType], List[Tuple[float, float]]]
+
 
 class IntensityDelta:
     """
@@ -40,69 +42,65 @@ class IntensityDelta:
     """
 
     __slots__ = ("_time", "_intensity", "_intensity_delta")
-    _cell_register = {} # type: ignore
+    _cell_register = {}  # type: ignore
 
     def __init__(
         self,
-        time: Optional[Union[npt.NDArray[np.float64], list[float]]] = None,
-        intensity: Optional[Union[npt.NDArray[np.float64], list[float]]] = None,
+        time: Optional[Union[npt.NDArray[np.float64], List[float]]] = None,
+        intensity: Optional[Union[npt.NDArray[np.float64], List[float]]] = None,
     ):
         """
         Parameters
         ----------
-        time: Optional[Union[`np.ndarray`, `list`]]
+        time: Optional[Union[`np.ndarray`, `List`]]
             Time index of the intensity timeseries.
 
-        intensity: Optional[Union[`np.ndarray`, `list`]]
+        intensity: Optional[Union[`np.ndarray`, `List`]]
             Intensity values (mm/h) of the intensity timeseries.
         """
 
         self._time, self._intensity = self._mrle_check(time, intensity)
         self._intensity_delta: npt.NDArray[np.float64] = np.column_stack(
-            (self._time[1: -1], np.diff(self._intensity[1: -1], prepend=0))
+            (self._time[1:-1], np.diff(self._intensity[1:-1], prepend=0))
         )
 
     @classmethod
     def fromDelta(
         cls,
-        time: Optional[Union[npt.NDArray[np.float64], list[float]]] = None,
-        intensity_delta: Optional[Union[npt.NDArray[np.float64], list[float]]] = None,
+        time: Optional[Union[npt.NDArray[np.float64], List[float]]] = None,
+        intensity_delta: Optional[Union[npt.NDArray[np.float64], List[float]]] = None,
     ) -> IntensityDelta:
         """
         Parameters:
         ----------
-        time: Optional[Union[`np.ndarray`, `list`]]
+        time: Optional[Union[`np.ndarray`, `List`]]
             Time index of the intensity timeseries.
             The order of the times does not matter.
             Duplicate times will be summed together.
 
-        intensity_delta: Optional[Union[`np.ndarray`, `list`]]
+        intensity_delta: Optional[Union[`np.ndarray`, `List`]]
             Delta Encoded Intensity values (mm/h) of the intensity timeseries.
 
         """
         time, intensity_delta = cls._delta_to_mrle(time, intensity_delta)
 
-        return cls(
-            time, intensity_delta
-        )
-    
+        return cls(time, intensity_delta)
+
     @staticmethod
     def _mrle_check(
-        time: Optional[Union[npt.NDArray[np.float64], list[float]]] = None,
-        intensity: Optional[Union[npt.NDArray[np.float64], list[float]]] = None,
+        time: Optional[Union[npt.NDArray[np.float64], List[float]]] = None,
+        intensity: Optional[Union[npt.NDArray[np.float64], List[float]]] = None,
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-                # Check if both time and intensity are None
+        # Check if both time and intensity are None
         if time is None or intensity is None:
             if time is not None or intensity is not None:
                 raise ValueError("time and intensity must both be None or not None")
-            
+
             _time: npt.NDArray[np.float64] = np.array(
                 [-np.inf, np.inf], dtype=np.float64
             )
 
-            _intensity: npt.NDArray[np.float64] = np.array(
-                [0, 0], dtype=np.float64
-            )
+            _intensity: npt.NDArray[np.float64] = np.array([0, 0], dtype=np.float64)
 
             return _time, _intensity
         else:
@@ -129,8 +127,8 @@ class IntensityDelta:
 
     @staticmethod
     def _delta_to_mrle(
-        time: Optional[Union[npt.NDArray[np.float64], list[float]]] = None,
-        intensity_delta: Optional[Union[npt.NDArray[np.float64], list[float]]] = None,
+        time: Optional[Union[npt.NDArray[np.float64], List[float]]] = None,
+        intensity_delta: Optional[Union[npt.NDArray[np.float64], List[float]]] = None,
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         time = np.array(time, dtype=np.float64)
         intensity_delta = np.array(intensity_delta, dtype=np.float64)
@@ -151,14 +149,17 @@ class IntensityDelta:
         _, unique_idx = np.unique(delta_encoding[:, 0][::-1], return_index=True)
         # Adjust indices to account for reversed order
         unique_indices = len(delta_encoding) - 1 - unique_idx
-        return delta_encoding[:, 0][unique_indices], delta_encoding[:, 1][unique_indices]
-    
+        return (
+            delta_encoding[:, 0][unique_indices],
+            delta_encoding[:, 1][unique_indices],
+        )
+
     @classmethod
-    def fromCells(cls, cells: list[CType]) -> IntensityDelta:
+    def fromCells(cls, cells: List[CType]) -> IntensityDelta:
         """
         Parameters:
         ----------
-            cells: list[`Cell`]:
+            cells: List[`Cell`]:
                 List of cells to convert to an IntensityRLE.
         """
         # Get the register function for the cell type
@@ -175,7 +176,9 @@ class IntensityDelta:
             for time, intensity_delta in delta_func(cell)
         ]
 
-        delta_encoding_np: npt.NDArray[np.float64] = np.array(delta_encoding, dtype=np.float64)
+        delta_encoding_np: npt.NDArray[np.float64] = np.array(
+            delta_encoding, dtype=np.float64
+        )
 
         return cls.fromDelta(
             time=delta_encoding_np[:, 0],
@@ -229,11 +232,11 @@ class IntensityDelta:
         self._intensity_delta = np.concatenate((self._intensity_delta, delta_encoding))
 
         _time, _intensity = self._delta_to_mrle(
-            time=self._intensity_delta[:, 0], 
-            intensity_delta=self._intensity_delta[:, 1]
+            time=self._intensity_delta[:, 0],
+            intensity_delta=self._intensity_delta[:, 1],
         )
         self._time, self._intensity = self._mrle_check(_time, _intensity)
-        
+
     def __add__(self, cell: Cell[Any]) -> IntensityDelta:
         try:
             delta_func = self._cell_register[type(cell)]
@@ -241,14 +244,13 @@ class IntensityDelta:
             raise KeyError(
                 f"Cell type {type(cell)} is not registered with IntensityDelta"
             )
-        
+
         delta_encoding = np.array(delta_func(cell), dtype=np.float64)
 
         _intensity_delta = np.concatenate((self._intensity_delta, delta_encoding))
 
         _time, _intensity = self._delta_to_mrle(
-            time=_intensity_delta[:, 0], 
-            intensity_delta=_intensity_delta[:, 1]
+            time=_intensity_delta[:, 0], intensity_delta=_intensity_delta[:, 1]
         )
 
         return type(self)(_time, _intensity)
@@ -282,5 +284,5 @@ class IntensityDelta:
 
 
 @IntensityDelta.register_cell(ConstantCell)
-def constant_cell_delta(cell: ConstantCell) -> list[tuple[float, float]]:
+def constant_cell_delta(cell: ConstantCell) -> List[tuple[float, float]]:
     return [(cell.start, cell.intensity_args), (cell.end, -cell.intensity_args)]

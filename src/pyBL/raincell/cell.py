@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic, List, TypeVar
 
 IntensityType = TypeVar('IntensityType')
 
@@ -26,7 +26,7 @@ class ConstantCell(Cell[float]):
 class Storm(Generic[IntensityType]):
     start_time: int
     end_time: int
-    cells: list[Cell[IntensityType]]
+    cells: List[Cell[IntensityType]]
 
     def __post_init__(self) -> None:
         if self.start_time > self.end_time:
