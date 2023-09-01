@@ -38,6 +38,7 @@ def Cal(x, timeScaleList, model):
 
 def Get_Props(Prop, theta, model):
     m_stat = -9999.0
+
     if Prop == "MEAN":
         m_stat = model.Mean(theta)
     elif Prop == "VAR":
@@ -65,3 +66,4 @@ def Get_Props(Prop, theta, model):
         m_stat = -9999.0
 
     return m_stat
+
