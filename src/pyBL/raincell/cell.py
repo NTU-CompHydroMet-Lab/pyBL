@@ -1,32 +1,33 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, List, TypeVar
+from typing import List, TypeVar
 
-IntensityType = TypeVar('IntensityType')
+# Intensity arguments type
+CType = TypeVar("CType", bound="Cell")
+CType_co = TypeVar("CType_co", bound="Cell", covariant=True)
 
 
 @dataclass
-class Cell(Generic[IntensityType]):
-
-    start: int
-    end: int
-    intensity_args: IntensityType
+class Cell:
+    start: float
+    end: float
 
     def __post_init__(self) -> None:
         if self.start > self.end:
             raise ValueError("Cell start time must be less than end time")
 
+
 @dataclass
-class ConstantCell(Cell[float]):
-    pass
+class ConstantCell(Cell):
+    intensity: float
 
 
 @dataclass(frozen=True)
-class Storm(Generic[IntensityType]):
+class Storm:
     start_time: int
     end_time: int
-    cells: List[Cell[IntensityType]]
+    cells: List[Cell]
 
     def __post_init__(self) -> None:
         if self.start_time > self.end_time:

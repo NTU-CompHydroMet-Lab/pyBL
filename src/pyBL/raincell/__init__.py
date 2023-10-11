@@ -1,1 +1,2 @@
-from .cell import Cell, Storm
+from .cell import *
+from .rcimodel import *
