@@ -1,4 +1,4 @@
-from pyBL.timeseries import IntensityDelta
+from pyBL.timeseries import IntensityMRLE
 from pyBL.raincell.cell import ConstantCell
 import numpy as np
 import pytest
@@ -7,13 +7,13 @@ import pytest
 @pytest.mark.parametrize(
     "time, intensity, expected_time, expected_intensity",
     [
-        ([1, 2, 3], [0, 1, 0], [1.0, 2.0, 3.0], [0.0, 1.0, 0.0]),
+        ([1, 2, 3], [0, 1, 0], [1.0, 2.0, 3.0, 4.0], [0.0, 1.0, 0.0, np.nan]),
     ],
 )
 def test_basic_instantiation(time, intensity, expected_time, expected_intensity):
-    rle = IntensityDelta(time, intensity)
+    rle = IntensityMRLE(time, intensity)
     assert rle.time.tolist() == expected_time
-    assert rle.intensity.tolist() == expected_intensity
+    assert np.array_equal(rle.intensity.tolist(), expected_intensity, equal_nan=True)
 
 
 @pytest.mark.parametrize(
@@ -35,28 +35,27 @@ def test_basic_instantiation(time, intensity, expected_time, expected_intensity)
         ),
         ([10, 10, 9, 10], [3, 6, 9, 12], "time must be strictly increasing"),
         ([10, 20, 9999999, 40], [3, 6, 9, 12], "time must be strictly increasing"),
-        ([10, 20, 40, 9999999], [3, 6, 9, 12], "Last intensity must be 0"),
     ],
 )
 def test_basic_instatiation_fail(time, intensity, error_msg):
     with pytest.raises(ValueError, match=error_msg):
-        IntensityDelta(time, intensity)
+        IntensityMRLE(time, intensity)
 
 
 def test_mismatched_time_intensity():
     with pytest.raises(
         ValueError, match="time and intensity must have the same length"
     ):
-        IntensityDelta([1, 2], [0, 1, 0])
+        IntensityMRLE([1, 2], [0, 1, 0])
 
 
 def test_from_cells():
     # assuming Cell is another class you've defined
     cell1 = ConstantCell(5, 13, 7)
     cell2 = ConstantCell(8, 21, 3)
-    rle = IntensityDelta.fromCells([cell1, cell2])
-    assert rle.time.tolist() == [5, 8, 13, 21]
-    assert rle.intensity.tolist() == [7, 10, 3, 0]
+    rle = IntensityMRLE.fromCells([cell1, cell2])
+    assert rle.time.tolist() == [5, 8, 13, 21, 22]
+    assert np.array_equal(rle.intensity.tolist(), [7, 10, 3, 0, np.nan], equal_nan=True)
 
 
 @pytest.mark.parametrize(
@@ -64,43 +63,43 @@ def test_from_cells():
     [
         (
             ConstantCell(1, 5, 3),
-            [1.0, 5.0, 10.0, 20.0, 30.0, 40.0],
-            [3.0, 0.0, 5.0, 10.0, 15.0, 0.0],
+            [1.0, 5.0, 10.0, 20.0, 30.0, 40.0, 41.0],
+            [3.0, 0.0, 5.0, 10.0, 15.0, 0.0, np.nan],
         ),
         (
             ConstantCell(1, 10, 3),
-            [1.0, 10.0, 20.0, 30.0, 40],
-            [3.0, 5.0, 10.0, 15.0, 0.0],
+            [1.0, 10.0, 20.0, 30.0, 40.0, 41.0],
+            [3.0, 5.0, 10.0, 15.0, 0.0, np.nan],
         ),
         (
             ConstantCell(1, 15, 3),
-            [1.0, 10.0, 15.0, 20.0, 30.0, 40],
-            [3.0, 8.0, 5.0, 10.0, 15.0, 0.0],
+            [1.0, 10.0, 15.0, 20.0, 30.0, 40.0, 41.0],
+            [3.0, 8.0, 5.0, 10.0, 15.0, 0.0, np.nan],
         ),
         (
             ConstantCell(1, 20, 3),
-            [1.0, 10.0, 20.0, 30.0, 40],
-            [3.0, 8.0, 10.0, 15.0, 0.0],
+            [1.0, 10.0, 20.0, 30.0, 40.0, 41.0],
+            [3.0, 8.0, 10.0, 15.0, 0.0, np.nan],
         ),
         (
             ConstantCell(1, 40, 3),
-            [1.0, 10.0, 20.0, 30.0, 40],
-            [3.0, 8.0, 13.0, 18.0, 0.0],
+            [1.0, 10.0, 20.0, 30.0, 40.0, 41.0],
+            [3.0, 8.0, 13.0, 18.0, 0.0, np.nan],
         ),
         (
             ConstantCell(1, 41, 3),
-            [1.0, 10.0, 20.0, 30.0, 40, 41],
-            [3.0, 8.0, 13.0, 18.0, 3.0, 0.0],
+            [1.0, 10.0, 20.0, 30.0, 40.0, 41.0, 42.0],
+            [3.0, 8.0, 13.0, 18.0, 3.0, 0.0, np.nan],
         ),
         (
             ConstantCell(-100, 25, 3),
-            [-100.0, 10.0, 20.0, 25.0, 30.0, 40],
-            [3.0, 8.0, 13.0, 10.0, 15.0, 0.0],
+            [-100.0, 10.0, 20.0, 25.0, 30.0, 40.0, 41.0],
+            [3.0, 8.0, 13.0, 10.0, 15.0, 0.0, np.nan],
         ),
     ],
 )
 def test_operational_add(new_cell, expected_time, expected_intensity):
-    rle = IntensityDelta([10, 20, 30, 40], [5, 10, 15, 0])
+    rle = IntensityMRLE([10, 20, 30, 40], [5, 10, 15, 0])
     """
     Testing different case when adding a cell to an RLE
     case1: 
@@ -112,7 +111,7 @@ def test_operational_add(new_cell, expected_time, expected_intensity):
     """
     result = rle + new_cell  # a sample cell with specific properties
     assert result.time.tolist() == expected_time
-    assert result.intensity.tolist() == expected_intensity
+    assert np.array_equal(result.intensity.tolist(), expected_intensity, equal_nan=True)
 
 
 @pytest.mark.parametrize(
@@ -126,7 +125,7 @@ def test_operational_add(new_cell, expected_time, expected_intensity):
     ],
 )
 def test_add(new_cell, times, intensities):
-    rle = IntensityDelta([10, 20, 30, 40], [5, 10, 15, 0])
+    rle = IntensityMRLE([10, 20, 30, 40], [5, 10, 15, 0])
 
     rle.add(new_cell)
     for time, intensity in zip(times, intensities):
