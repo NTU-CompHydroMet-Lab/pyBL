@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import yaml
 from scipy.stats import moment, skew, variation
-from statsmodels.tsa.stattools import acovf
 
 
 def change_timescale(target_dataframe, scale):

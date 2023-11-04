@@ -434,6 +434,7 @@ def _mrle_rescale(
             scale_time[rescale_idx] = r_srt
             scale_intensity[rescale_idx] += intensity_i*(end-srt)
             rescale_idx += 1
+        
         if r_srt + 1 == r_end:
             if scale_time[rescale_idx - 1] == r_srt:
                 rescale_idx -= 1
@@ -443,6 +444,7 @@ def _mrle_rescale(
             scale_time[rescale_idx] = r_end
             scale_intensity[rescale_idx] += intensity_i*((end-1) % scale + 1)
             rescale_idx += 1
+            
         if r_srt + 1 < r_end:
             if scale_time[rescale_idx - 1] == r_srt:
                 rescale_idx -= 1
