@@ -20,7 +20,7 @@ __all__ = ["IntensityMRLE"]
 
 CDelta = Callable[[CType], List[Tuple[float, float]]]
 
-IMRLESequence = Optional[Union[npt.NDArray[np.float64], List[float]]]
+IMRLESequence = Optional[Union[npt.NDArray[np.float64], npt.NDArray[np.int64], List[float]]]
 
 
 class IntensityMRLE:
@@ -59,7 +59,6 @@ class IntensityMRLE:
         intensity: Optional[Union[`np.ndarray`, `List`]]
             Intensity values (mm/h) of the intensity timeseries.
         """
-
         self._time, self._intensity = _mrle_check(time, intensity)
         self._intensity_delta: npt.NDArray[np.float64] = np.column_stack(
             (self._time[: -1], np.diff(self._intensity[: -1], prepend=0))
@@ -79,15 +78,15 @@ class IntensityMRLE:
         time: Optional[Union[`np.ndarray`, `List`]]
             Time index of the intensity timeseries.
             The order of the times does not matter.
-            Duplicate times will be summed together.
+            Duplicate times will be summed together. (Because it's multiple delta at the same time)
 
         intensity_delta: Optional[Union[`np.ndarray`, `List`]]
             Delta Encoded Intensity values (mm/h) of the intensity timeseries.
 
         """
-        time, intensity_delta = _delta_to_mrle(time, intensity_delta)
+        time, intensity_mrle = _delta_to_mrle(time, intensity_delta)
 
-        return cls(time, intensity_delta, scale)
+        return cls(time, intensity_mrle, scale)
 
     @classmethod
     def fromCells(cls, cells: List[CType], scale: int = 1) -> IntensityMRLE:
@@ -143,7 +142,23 @@ class IntensityMRLE:
     def intensity_delta(self) -> npt.NDArray[np.float64]:
         return self._intensity_delta
 
-    def add(self, cell: Cell) -> None:
+    @overload
+    def add(self, intensity: IntensityMRLE) -> None:
+        ...
+    
+    @overload
+    def add(self, intensity: Cell) -> None:
+        ...
+
+    def add(self, intensity: Union[Cell, IntensityMRLE]) -> None:
+        if isinstance(intensity, Cell):
+            self._add_cell(cell = intensity)
+        elif isinstance(intensity, IntensityMRLE):
+            self._add_mrle(timeseries = intensity)
+        else:
+            raise TypeError("cell must be a Cell or IntensityMRLE")
+    
+    def _add_cell(self, cell: Cell) -> None:
         try:
             delta_func = self._cell_register[type(cell)]
         except KeyError:
@@ -161,6 +176,28 @@ class IntensityMRLE:
         )
 
         self._time, self._intensity = _mrle_check(_time, _intensity)
+            
+    def _add_mrle(self, timeseries: IntensityMRLE) -> None:
+        if self._scale != timeseries._scale:
+            raise ValueError("Adding two timeseries with different scale is not supported '''YET'''.")
+        len_slf = len(self.intensity_delta)
+        len_obj = len(timeseries.intensity_delta)
+        intensity_delta = np.concatenate((self.intensity_delta, timeseries.intensity_delta))
+        
+        time, intensity= _delta_to_mrle(intensity_delta[:, 0], intensity_delta[:, 1])
+        self._time, self._intensity = _mrle_check(time, intensity)
+        self._intensity_delta: npt.NDArray[np.float64] = np.column_stack(
+            (self._time[: -1], np.diff(self._intensity[: -1], prepend=0))
+        )
+
+    def __iadd__(self, intensity: Union[Cell, IntensityMRLE]) -> IntensityMRLE:
+        if isinstance(intensity, Cell):
+            self._add_cell(cell = intensity)
+        elif isinstance(intensity, IntensityMRLE):
+            self._add_mrle(timeseries = intensity)
+        else:
+            raise TypeError("cell must be a Cell or IntensityMRLE")
+        return self
 
     def __add__(self, cell: Cell) -> IntensityMRLE:
         try:
@@ -180,7 +217,7 @@ class IntensityMRLE:
         return type(self)(_time, _intensity, self._scale)
 
     @overload
-    def __getitem__(self, time_idx: slice) -> npt.NDArray[np.float64]:
+    def __getitem__(self, time_idx: slice) -> IntensityMRLE:
         ...
 
     @overload
@@ -189,18 +226,41 @@ class IntensityMRLE:
 
     def __getitem__(self, time_idx: Any) -> Any:
         if isinstance(time_idx, slice):
-            """
-            TODO: Implement this
-            """
-            raise NotImplementedError
+            return self._get_slice_idx(time_idx)
         elif isinstance(time_idx, int):
-            # Use binary search to find the index
-            idx = np.searchsorted(a=self._time, v=time_idx, side="right")
-            if idx == 0 or idx == len(self._time):
-                return 0.0
-            return self._intensity[idx - 1]
+            return self._get_int_idx(time_idx)
         else:
             raise TypeError("time_idx must be an int or a slice")
+    
+    def _get_slice_idx(self, time_idx: slice) -> IntensityMRLE:
+        if time_idx.start >= time_idx.stop:
+            return type(self)(scale=self._scale)
+        # Use binary search to find the index
+        start_idx = np.searchsorted(a=self._time, v=time_idx.start, side="right")
+        stop_idx = np.searchsorted(a=self._time, v=time_idx.stop, side="left")
+        
+        if start_idx == len(self._time):
+            return type(self)(scale=self._scale)
+        if stop_idx == 0:
+            return type(self)(scale=self._scale)
+        
+        time = self._time[max(0, start_idx-1):stop_idx]
+        intensity = self._intensity[max(0, start_idx-1):stop_idx]
+
+        if start_idx != 0:
+            time[0] = time_idx.start
+        if stop_idx < len(self._time) and time[-1] != time_idx.stop-1:
+            time = np.append(time, time_idx.stop-1)
+            intensity = np.append(intensity, intensity[-1])
+
+        return type(self)(time, intensity, self._scale)
+
+    def _get_int_idx(self, time_idx: int) -> np.float64:
+        # Use binary search to find the index
+        idx = np.searchsorted(a=self._time, v=time_idx, side="right")
+        if idx == 0 or idx == len(self._time):
+            return 0.0
+        return self._intensity[idx - 1]
 
     def __str__(self) -> str:
         time = "Time: " + " ".join(f"{num:>{5}}" for num in self.time)
@@ -444,7 +504,7 @@ def _mrle_rescale(
             scale_time[rescale_idx] = r_end
             scale_intensity[rescale_idx] += intensity_i*((end-1) % scale + 1)
             rescale_idx += 1
-            
+
         if r_srt + 1 < r_end:
             if scale_time[rescale_idx - 1] == r_srt:
                 rescale_idx -= 1
