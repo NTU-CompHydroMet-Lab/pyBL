@@ -14,11 +14,7 @@ from typing import (
 import numpy as np
 import numpy.typing as npt
 
-from pyBL.raincell.cell import Cell, ConstantCell, CType
-
 __all__ = ["IntensityMRLE"]
-
-CDelta = Callable[[CType], List[Tuple[float, float]]]
 
 IMRLESequence = Optional[Union[npt.NDArray[np.float64], npt.NDArray[np.int64], List[float]]]
 
@@ -42,7 +38,6 @@ class IntensityMRLE:
     """
 
     __slots__ = ("_time", "_intensity", "_intensity_delta", "_scale")
-    _cell_register = {}  # type: ignore
 
     def __init__(
         self,
@@ -60,9 +55,12 @@ class IntensityMRLE:
             Intensity values (mm/h) of the intensity timeseries.
         """
         self._time, self._intensity = _mrle_check(time, intensity)
-        self._intensity_delta: npt.NDArray[np.float64] = np.column_stack(
-            (self._time[: -1], np.diff(self._intensity[: -1], prepend=0))
-        )
+        if len(self._time) != 0:
+            self._intensity_delta: npt.NDArray[np.float64] = np.column_stack(
+                (self._time, np.diff(self._intensity[: -1], prepend=0, append=0))
+            )
+        else: 
+            self._intensity_delta = np.array([], dtype=np.float64)
         self._scale = scale
 
     @classmethod
@@ -88,48 +86,6 @@ class IntensityMRLE:
 
         return cls(time, intensity_mrle, scale)
 
-    @classmethod
-    def fromCells(cls, cells: List[CType], scale: int = 1) -> IntensityMRLE:
-        """
-        Parameters:
-        ----------
-            cells: List[`Cell`]:
-                List of cells to convert to an IntensityRLE.
-        """
-        # Get the register function for the cell type
-        try:
-            delta_func = cls._cell_register[type(cells[0])]
-        except KeyError:
-            raise KeyError(
-                f"Cell type {type(cells[0])} is not registered with IntensityDelta"
-            )
-
-        delta_encoding = [
-            [time, intensity_delta]
-            for cell in cells
-            for time, intensity_delta in delta_func(cell)
-        ]
-
-        delta_encoding_np: npt.NDArray[np.float64] = np.array(
-            delta_encoding, dtype=np.float64
-        )
-
-        return cls.fromDelta(
-            time=delta_encoding_np[:, 0],
-            intensity_delta=delta_encoding_np[:, 1],
-            scale=scale
-        )
-
-    @classmethod
-    def register_cell(
-        cls, cell_type: Type[CType]
-    ) -> Callable[[CDelta[CType]], CDelta[CType]]:
-        def decorator(func: CDelta[CType]) -> CDelta[CType]:
-            cls._cell_register[cell_type] = func
-            return func
-
-        return decorator
-
     @property
     def time(self) -> npt.NDArray[np.float64]:
         return self._time
@@ -142,79 +98,28 @@ class IntensityMRLE:
     def intensity_delta(self) -> npt.NDArray[np.float64]:
         return self._intensity_delta
 
-    @overload
-    def add(self, intensity: IntensityMRLE) -> None:
-        ...
-    
-    @overload
-    def add(self, intensity: Cell) -> None:
-        ...
+    def add(self, timeseries: IntensityMRLE, sequential=False) -> None:
+        if len(timeseries.time) == 0:
+            return
+        if sequential is True:
+            if len(self._time) != 0:
+                # Shift the start of the timeseries to be right after th last time of the current timeseries
+                timeseries = IntensityMRLE(
+                    timeseries.time - (timeseries.time[0] - self._time[-1]), timeseries.intensity, timeseries._scale
+                )
+        self.__iadd__(timeseries)
 
-    def add(self, intensity: Union[Cell, IntensityMRLE]) -> None:
-        if isinstance(intensity, Cell):
-            self._add_cell(cell = intensity)
-        elif isinstance(intensity, IntensityMRLE):
-            self._add_mrle(timeseries = intensity)
-        else:
-            raise TypeError("cell must be a Cell or IntensityMRLE")
-    
-    def _add_cell(self, cell: Cell) -> None:
-        try:
-            delta_func = self._cell_register[type(cell)]
-        except KeyError:
-            raise KeyError(
-                f"Cell type {type(cell)} is not registered with IntensityDelta"
-            )
+    def __iadd__(self, timeseries: IntensityMRLE) -> IntensityMRLE:
 
-        delta_encoding = np.array(delta_func(cell), dtype=np.float64)
-
-        self._intensity_delta = np.concatenate((self._intensity_delta, delta_encoding))
-
-        _time, _intensity = _delta_to_mrle(
-            time=self._intensity_delta[:, 0],
-            intensity_delta=self._intensity_delta[:, 1],
-        )
-
-        self._time, self._intensity = _mrle_check(_time, _intensity)
-            
-    def _add_mrle(self, timeseries: IntensityMRLE) -> None:
-        if self._scale != timeseries._scale:
-            raise ValueError("Adding two timeseries with different scale is not supported '''YET'''.")
-        len_slf = len(self.intensity_delta)
-        len_obj = len(timeseries.intensity_delta)
-        intensity_delta = np.concatenate((self.intensity_delta, timeseries.intensity_delta))
+        result_mrle = _merge_mrle(self, timeseries)
         
-        time, intensity= _delta_to_mrle(intensity_delta[:, 0], intensity_delta[:, 1])
-        self._time, self._intensity = _mrle_check(time, intensity)
-        self._intensity_delta: npt.NDArray[np.float64] = np.column_stack(
-            (self._time[: -1], np.diff(self._intensity[: -1], prepend=0))
-        )
+        self._time, self._intensity = result_mrle._time, result_mrle._intensity
+        self._intensity_delta = result_mrle._intensity_delta
 
-    def __iadd__(self, intensity: Union[Cell, IntensityMRLE]) -> IntensityMRLE:
-        if isinstance(intensity, Cell):
-            self._add_cell(cell = intensity)
-        elif isinstance(intensity, IntensityMRLE):
-            self._add_mrle(timeseries = intensity)
-        else:
-            raise TypeError("cell must be a Cell or IntensityMRLE")
         return self
 
-    def __add__(self, cell: Cell) -> IntensityMRLE:
-        try:
-            delta_func = self._cell_register[type(cell)]
-        except KeyError:
-            raise KeyError(
-                f"Cell type {type(cell)} is not registered with IntensityDelta"
-            )
-
-        delta_encoding = np.array(delta_func(cell), dtype=np.float64)
-        _intensity_delta = np.concatenate((self._intensity_delta, delta_encoding))
-
-        _time, _intensity = _delta_to_mrle(
-            time=_intensity_delta[:, 0], intensity_delta=_intensity_delta[:, 1]
-        )
-
-        return type(self)(_time, _intensity, self._scale)
+    def __add__(self, timeseries: IntensityMRLE) -> IntensityMRLE:
+        return _merge_mrle(self, timeseries)
 
     @overload
     def __getitem__(self, time_idx: slice) -> IntensityMRLE:
@@ -266,24 +171,37 @@ class IntensityMRLE:
         time = "Time: " + " ".join(f"{num:>{5}}" for num in self.time)
         intensity = "Intensity: " + " ".join(f"{num:>{5}}" for num in self.intensity)
 
-        return time + "\n" + intensity + "\n"
+        time_value = "\n".join(f'{self.time[i]:>5.3f} {self.intensity[i]:>5.3f}' for i in range(len(self.time)))
+        return time_value
     
     def mean(self) -> float:
+        if self._time.size == 0:
+            return np.nan
         return _mrle_mean(self._time, self._intensity) / self._scale
     
     def acf(self, lag=1) -> float:
+        if self._time.size == 0:
+            return np.nan
         return _mrle_acf(self._time, self._intensity, lag=lag)
     
     def cvar(self, ddof=1) -> float:
+        if self._time.size == 0:
+            return np.nan
         return _mrle_cvar(self._time, self._intensity, ddof=ddof)
     
-    def skew(self) -> float:
-        return _mrle_skew(self._time, self._intensity)
+    def skewness(self, biased_sd=True) -> float:
+        if self._time.size == 0:
+            return np.nan
+        return _mrle_skew(self._time, self._intensity, biased_sd=biased_sd)
     
-    def pDry(self) -> float:
-        return _mrle_pDry(self._time, self._intensity)
+    def pDry(self, threshold: float=0) -> float:
+        if self._time.size == 0:
+            return np.nan
+        return _mrle_pDry(self._time, self._intensity, threshold=threshold)
     
     def rescale(self, scale: float) -> IntensityMRLE:
+        if self._time.size == 0:
+            return type(self)(scale=self._scale * scale)
         scale_time, scale_intensity = _mrle_rescale(self._time, self._intensity, scale)
         return type(self)(scale_time, scale_intensity, self._scale * scale)
 
@@ -352,13 +270,14 @@ def _delta_to_mrle(
     intensity_delta: IMRLESequence = None,
     delta_encoding: Optional[npt.NDArray[np.float64]] = None,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    if not isinstance(time, np.ndarray):
-        time = np.array(time, dtype=np.float64)
-    if not isinstance(intensity_delta, np.ndarray):
-        intensity_delta = np.array(intensity_delta, dtype=np.float64)
-
-    # Zip time and intensity_delta into a 2D array
-    delta_encoding = np.column_stack((time, intensity_delta))
+    if delta_encoding is None:
+        if not isinstance(time, np.ndarray):
+            time = np.array(time, dtype=np.float64)
+        if not isinstance(intensity_delta, np.ndarray):
+            intensity_delta = np.array(intensity_delta, dtype=np.float64)
+    
+        # Zip time and intensity_delta into a 2D array
+        delta_encoding = np.column_stack((time, intensity_delta))
 
     # Sort the change_time_idx by time
     delta_encoding = delta_encoding[np.argsort(delta_encoding[:, 0])]
@@ -381,9 +300,29 @@ def _delta_to_mrle(
         delta_encoding[:, 1][unique_indices],
     )
 
-@IntensityMRLE.register_cell(ConstantCell)
-def constant_cell_delta(cell: ConstantCell) -> List[tuple[float, float]]:
-    return [(cell.start, cell.intensity), (cell.end, -cell.intensity)]
+def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
+    if a._scale != b._scale:
+        raise ValueError("Merging two timeseries with different scale is not supported '''YET'''.")
+    if len(a.intensity_delta) == 0 and len(b.intensity_delta) == 0:
+        return IntensityMRLE(scale=a._scale)
+    if len(a.intensity_delta) == 0:
+        intensity_delta = b.intensity_delta
+    elif len(b.intensity_delta) == 0:
+        intensity_delta = a.intensity_delta
+    else:
+        intensity_delta = np.concatenate((a.intensity_delta, b.intensity_delta))
+        
+    time, intensity= _delta_to_mrle(intensity_delta[:, 0], intensity_delta[:, 1])
+    # The intensity at the end of the timeseries should be np.nan
+    # But when we extract the intensity_delta, we replace it with 0 to make the calculation easier.
+    # Other 0 value is included in the timeseries.
+    # But the last 0 value is not included in the timeseries. So we need to add it back by replacing the last value with np.nan
+    intensity[-1] = np.nan
+
+    if len(time) == 0:
+        return IntensityMRLE(scale=a._scale)
+
+    return IntensityMRLE(time, intensity, a._scale)
 
 def _mrle_mean(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
     each_intensity_duration = np.diff(time)
@@ -441,7 +380,7 @@ def _mrle_cvar(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 
     return (sse / (time[-1] - time[0] - ddof))**0.5 / mean
 
-def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None) -> float:
+def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, biased_sd = True) -> float:
     # Skewness
     n = time[-1] - time[0]
     if mean is None:
@@ -458,7 +397,7 @@ def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 
     # Standard deviation
     # TODO: Check how to do unbiased standard deviation on MRLE when time is float
-    sd = (sse / (n - 1))**0.5 
+    sd = (sse / (n - (biased_sd == True)))**0.5 
 
     # Skewness
     skewness = 0
@@ -467,10 +406,10 @@ def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
     skewness = skewness/(((time[-1] - time[0]))*sd**3)
     return skewness
 
-def _mrle_pDry(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
+def _mrle_pDry(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], threshold=0) -> float:
     wet_time = 0
     for i in range(len(time)-1):
-        if intensity[i] > 0:
+        if intensity[i] > threshold:
             wet_time += time[i+1] - time[i]
 
     return 1 - (wet_time / (time[-1] - time[0]))
