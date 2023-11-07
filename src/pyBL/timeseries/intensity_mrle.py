@@ -171,13 +171,13 @@ class IntensityMRLE:
         time = "Time: " + " ".join(f"{num:>{5}}" for num in self.time)
         intensity = "Intensity: " + " ".join(f"{num:>{5}}" for num in self.intensity)
 
-        time_value = "\n".join(f'{self.time[i]:>5.3f} {self.intensity[i]:>5.3f}' for i in range(len(self.time)))
+        time_value = "\n".join(f'{self.time[i]:>5.2f} {self.intensity[i]:>5.7f}' for i in range(len(self.time)))
         return time_value
     
     def mean(self) -> float:
         if self._time.size == 0:
             return np.nan
-        return _mrle_mean(self._time, self._intensity) / self._scale
+        return _mrle_mean(self._time, self._intensity)
     
     def acf(self, lag=1) -> float:
         if self._time.size == 0:
@@ -204,6 +204,17 @@ class IntensityMRLE:
             return type(self)(scale=self._scale * scale)
         scale_time, scale_intensity = _mrle_rescale(self._time, self._intensity, scale)
         return type(self)(scale_time, scale_intensity, self._scale * scale)
+    
+    def unpack(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        if self._time.size == 0:
+            return np.array([], dtype=np.float64), np.array([], dtype=np.float64)
+        else:
+            if not np.all(self._time % 1 == 0):
+                print("Warning: Unpacking MRLE with float time index. Resulting time index will be rounded to integer.")
+            diff_time = np.diff(self._time).astype(np.int64)
+            intensity = np.repeat(self._intensity[:-1], diff_time)
+            time = np.arange(self._time[0], self._time[-1])
+            return time, intensity
 
     
 

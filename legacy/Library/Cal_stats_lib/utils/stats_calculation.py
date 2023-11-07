@@ -106,6 +106,12 @@ def calculateWeight(monthlyData, sinStaProp, pDryThreshold=0):
     elif sinStaProp == "pDry":
         func = cal_pDry
 
+    # Check if monthlyData is Jan
+    if monthlyData.index.month.unique() == 1 and sinStaProp == "AR-1":
+        print(f"Monthly data is Jan")
+        print(monthlyData[monthlyData.index.year == 1987].values)
+        print(cal_AR1(monthlyData[monthlyData.index.year == 1987]))
+
     if sinStaProp != "pDry":
         stat_list = [
             func(monthlyData[monthlyData.index.year == curYear]) for curYear in years
@@ -117,6 +123,7 @@ def calculateWeight(monthlyData, sinStaProp, pDryThreshold=0):
             )
             for curYear in years
         ]
+
 
     # return 1.0 / np.var(stat_list) if len(years) > 4 else (1 / np.mean(stat_list)) ** 2
     # print(f'Month : {monthlyData.index.month.unique()}, {stat_list}')
