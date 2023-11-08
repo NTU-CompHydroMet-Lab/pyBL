@@ -189,7 +189,7 @@ class IntensityMRLE:
             return np.nan
         return _mrle_cvar(self._time, self._intensity, ddof=ddof)
     
-    def skewness(self, biased_sd=False) -> float:
+    def skewness(self, biased_sd=True) -> float:
         if self._time.size == 0:
             return np.nan
         return _mrle_skew(self._time, self._intensity, biased_sd=biased_sd)
