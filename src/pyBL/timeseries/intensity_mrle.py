@@ -189,7 +189,7 @@ class IntensityMRLE:
             return np.nan
         return _mrle_cvar(self._time, self._intensity, ddof=ddof)
     
-    def skewness(self, biased_sd=True) -> float:
+    def skewness(self, biased_sd=False) -> float:
         if self._time.size == 0:
             return np.nan
         return _mrle_skew(self._time, self._intensity, biased_sd=biased_sd)
@@ -391,7 +391,7 @@ def _mrle_cvar(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 
     return (sse / (time[-1] - time[0] - ddof))**0.5 / mean
 
-def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, biased_sd = True) -> float:
+def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, biased_sd = False) -> float:
     # Skewness
     n = time[-1] - time[0]
     if mean is None:
@@ -408,7 +408,7 @@ def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 
     # Standard deviation
     # TODO: Check how to do unbiased standard deviation on MRLE when time is float
-    sd = (sse / (n - (biased_sd == True)))**0.5 
+    sd = (sse / (n - (biased_sd == False)))**0.5 
 
     # Skewness
     skewness = 0

@@ -106,7 +106,7 @@ class BLRPR(BaseBLRP):
         self.lambda_: float = params.lambda_ if params is not None else 0.1
         self.phi: float = params.phi if params is not None else 0.1
         self.kappa: float = params.kappa if params is not None else 0.1
-        self.alpha: float = params.alpha if params is not None else 0.1
+        self.alpha: float = params.alpha if params is not None else 3
         self.nu: float = params.nu if params is not None else 0.1
         self.mu_x: float = params.mu_x if params is not None else 0.1
 
@@ -162,13 +162,13 @@ class BLRPRx(BaseBLRP):
         # )
 
         # If user does not provide params, give the default values.
-        self.lambda_: float = params.lambda_ if params is not None else 0.1
-        self.phi: float = params.phi if params is not None else 0.1
-        self.kappa: float = params.kappa if params is not None else 0.1
-        self.alpha: float = params.alpha if params is not None else 0.1
-        self.nu: float = params.nu if params is not None else 0.1
-        self.sigmax_mux: float = params.sigmax_mux if params is not None else 0.1
-        self.iota: float = params.iota if params is not None else 0.1
+        self.lambda_: float = params.lambda_ if params is not None else 0.015
+        self.phi: float = params.phi if params is not None else 0.02
+        self.kappa: float = params.kappa if params is not None else 0.5
+        self.alpha: float = params.alpha if params is not None else 3
+        self.nu: float = params.nu if params is not None else 0.5
+        self.sigmax_mux: float = params.sigmax_mux if params is not None else 1
+        self.iota: float = params.iota if params is not None else 0.5
 
     def unpack_params(
         self, params: Optional[BLRPRx_params]
@@ -435,7 +435,8 @@ class BLRPRx(BaseBLRP):
                 self.variance(timescale, params), 1.5
             )
         else:
-            raise ValueError(f"Prop {prop} is not supported in BLRPRx. ")
+            print(f"Property {prop} is not implemented")
+            return 0.0
 
     def sample(
         self, duration_hr: float, params: Optional[BLRPRx_params] = None
