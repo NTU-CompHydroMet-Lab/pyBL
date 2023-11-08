@@ -444,23 +444,28 @@ class BLRPRx(BaseBLRP):
         lambda_, phi, kappa, alpha, nu, sigmax_mux, iota = self.unpack_params(params)
         rng = self.rng
 
-        # Calculate the original parameters
-        eta = rng.gamma(alpha, 1 / nu)
-        gamma = phi * eta
-        beta = kappa * eta
-        mux = iota * eta
-
-        # Storm sampling
+        # Storm number sampling
         n_storm = rng.poisson(lambda_ * duration_hr)
-        storm_starts = rng.uniform(0, duration_hr, n_storm)
-        storm_durations = rng.exponential(1 / gamma, n_storm)
+
+        # Calculate the original parameters
+        eta = rng.gamma(alpha, 1 / nu, size=n_storm)    # (n_storm, )
+        gamma = phi * eta                               # (n_storm, )
+        beta = kappa * eta                              # (n_storm, )
+        mux = iota * eta                                # (n_storm, )
+
+        # Storm parameters sampling
+        storm_starts = rng.uniform(0, duration_hr, n_storm)     # (n_storm, )
+        storm_durations = rng.exponential(1 / gamma, n_storm)   # (n_storm, )
 
         # Cell sampling
-        n_cells_per_storm = 1 + rng.poisson(beta * storm_durations, size=n_storm)
+        n_cells_per_storm = 1 + rng.poisson(beta * storm_durations, size=n_storm)   # (n_storm, )
         total_cells: int = n_cells_per_storm.sum()
 
         # Pre-allocate arrays
         cell_starts = np.zeros(total_cells)
+        cell_durations = np.zeros(total_cells)
+        cell_intensities = np.zeros(total_cells)
+
         cells_start_idx = 0
         for i, (s, d) in enumerate(zip(storm_starts, storm_durations)):
             cell_starts[
@@ -469,12 +474,18 @@ class BLRPRx(BaseBLRP):
             cell_starts[
                 cells_start_idx + 1 : cells_start_idx + n_cells_per_storm[i]
             ] = rng.uniform(s, s + d, n_cells_per_storm[i] - 1)
+
+            cell_durations[
+                cells_start_idx : cells_start_idx + n_cells_per_storm[i]
+            ] = rng.exponential(scale=1 / eta[i], size=n_cells_per_storm[i])
+
+            cell_intensities[
+                cells_start_idx : cells_start_idx + n_cells_per_storm[i]
+            ] = self.rci_model.sample_intensity(
+                mux=mux[i], sigmax_mux=sigmax_mux, n_cells=n_cells_per_storm[i]
+            )
             cells_start_idx += n_cells_per_storm[i]
 
-        cell_durations = rng.exponential(scale=1 / eta, size=total_cells)
-        cell_intensities = self.rci_model.sample_intensity(
-            mux=mux, sigmax_mux=sigmax_mux, n_cells=total_cells
-        )
         cell_ends = cell_starts + cell_durations
 
         # Flatten cell_starts, cell_ends, cell_intensities and stack them together
