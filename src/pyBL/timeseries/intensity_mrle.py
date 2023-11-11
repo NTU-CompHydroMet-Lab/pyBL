@@ -2,11 +2,8 @@ from __future__ import annotations
 
 from typing import (
     Any,
-    Callable,
     List,
     Optional,
-    Tuple,
-    Type,
     Union,
     overload,
 )
@@ -59,7 +56,7 @@ class IntensityMRLE:
             self._intensity_delta: npt.NDArray[np.float64] = np.column_stack(
                 (self._time, np.diff(self._intensity[: -1], prepend=0, append=0))
             )
-        else: 
+        else:
             self._intensity_delta = np.array([], dtype=np.float64)
         self._scale = scale
 
@@ -112,7 +109,7 @@ class IntensityMRLE:
     def __iadd__(self, timeseries: IntensityMRLE) -> IntensityMRLE:
 
         result_mrle = _merge_mrle(self, timeseries)
-        
+
         self._time, self._intensity = result_mrle._time, result_mrle._intensity
         self._intensity_delta = result_mrle._intensity_delta
 
@@ -136,19 +133,19 @@ class IntensityMRLE:
             return self._get_int_idx(time_idx)
         else:
             raise TypeError("time_idx must be an int or a slice")
-    
+
     def _get_slice_idx(self, time_idx: slice) -> IntensityMRLE:
         if time_idx.start >= time_idx.stop:
             return type(self)(scale=self._scale)
         # Use binary search to find the index
         start_idx = np.searchsorted(a=self._time, v=time_idx.start, side="right")
         stop_idx = np.searchsorted(a=self._time, v=time_idx.stop, side="left")
-        
+
         if start_idx == len(self._time):
             return type(self)(scale=self._scale)
         if stop_idx == 0:
             return type(self)(scale=self._scale)
-        
+
         time = self._time[max(0, start_idx-1):stop_idx]
         intensity = self._intensity[max(0, start_idx-1):stop_idx]
 
@@ -164,47 +161,46 @@ class IntensityMRLE:
         # Use binary search to find the index
         idx = np.searchsorted(a=self._time, v=time_idx, side="right")
         if idx == 0 or idx == len(self._time):
-            return 0.0
+            return np.float64(0)
         return self._intensity[idx - 1]
 
     def __str__(self) -> str:
-        time = "Time: " + " ".join(f"{num:>{5}}" for num in self.time)
-        intensity = "Intensity: " + " ".join(f"{num:>{5}}" for num in self.intensity)
-
-        time_value = "\n".join(f'{self.time[i]:>5.2f} {self.intensity[i]:>5.7f}' for i in range(len(self.time)))
+        time_value = "\n".join(f'{self.time[i]:>5.7f} {self.intensity[i]:>5.7f}' for i in range(len(self.time)))
         return time_value
-    
+
     def mean(self) -> float:
         if self._time.size == 0:
             return np.nan
         return _mrle_mean(self._time, self._intensity)
-    
+
     def acf(self, lag=1) -> float:
         if self._time.size == 0:
             return np.nan
         return _mrle_acf(self._time, self._intensity, lag=lag)
-    
+
     def cvar(self, ddof=1) -> float:
         if self._time.size == 0:
             return np.nan
         return _mrle_cvar(self._time, self._intensity, ddof=ddof)
-    
+
     def skewness(self, biased_sd=True) -> float:
         if self._time.size == 0:
             return np.nan
         return _mrle_skew(self._time, self._intensity, biased_sd=biased_sd)
-    
+
     def pDry(self, threshold: float=0) -> float:
         if self._time.size == 0:
             return np.nan
         return _mrle_pDry(self._time, self._intensity, threshold=threshold)
-    
+
     def rescale(self, scale: float) -> IntensityMRLE:
         if self._time.size == 0:
             return type(self)(scale=self._scale * scale)
         scale_time, scale_intensity = _mrle_rescale(self._time, self._intensity, scale)
+        print(f'This is {self._scale}')
+        print("".join(f'{scale_time[i]:>5.7f} {scale_intensity[i]:>5.7f}\n' for i in range(len(scale_time))))
         return type(self)(scale_time, scale_intensity, self._scale * scale)
-    
+
     def unpack(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         if self._time.size == 0:
             return np.array([], dtype=np.float64), np.array([], dtype=np.float64)
@@ -216,7 +212,7 @@ class IntensityMRLE:
             time = np.arange(self._time[0], self._time[-1])
             return time, intensity
 
-    
+
 
 def _mrle_check(
     time: IMRLESequence = None,
@@ -286,7 +282,7 @@ def _delta_to_mrle(
             time = np.array(time, dtype=np.float64)
         if not isinstance(intensity_delta, np.ndarray):
             intensity_delta = np.array(intensity_delta, dtype=np.float64)
-    
+
         # Zip time and intensity_delta into a 2D array
         delta_encoding = np.column_stack((time, intensity_delta))
 
@@ -322,7 +318,7 @@ def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
         intensity_delta = a.intensity_delta
     else:
         intensity_delta = np.concatenate((a.intensity_delta, b.intensity_delta))
-        
+
     time, intensity= _delta_to_mrle(intensity_delta[:, 0], intensity_delta[:, 1])
     # The intensity at the end of the timeseries should be np.nan
     # But when we extract the intensity_delta, we replace it with 0 to make the calculation easier.
@@ -349,19 +345,19 @@ def _mrle_acf(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64],
         for i in range(n-1):
             sum += intensity[i] * (time[i+1] - time[i])
         mean = sum / (time[-1] - time[0]) #Mean
-        
+
     if sse is None:
         sse = 0
         for i in range(n-1):
             sse += (intensity[i] - mean)**2 * (time[i+1] - time[i])
-    
+
     shift = 0
     for time_idx in time:
         if time_idx < lag + time[0]:
             shift += 1
         else:
             break
-    
+
     x_idx = shift
     y_idx = 1
     result = 0
@@ -383,7 +379,7 @@ def _mrle_cvar(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
         for i in range(len(time)-1):
             sum += intensity[i] * (time[i+1] - time[i])
         mean = sum / (time[-1] - time[0]) #Mean
-        
+
     if sse is None:
         sse = 0
         for i in range(len(time)-1):
@@ -408,7 +404,7 @@ def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 
     # Standard deviation
     # TODO: Check how to do unbiased standard deviation on MRLE when time is float
-    sd = (sse / (n - (biased_sd == False)))**0.5 
+    sd = (sse / (n - (biased_sd is False)))**0.5
 
     # Skewness
     skewness = 0
@@ -417,7 +413,7 @@ def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
     skewness = skewness/(((time[-1] - time[0]))*sd**3)
     return skewness
 
-def _mrle_pDry(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], threshold=0) -> float:
+def _mrle_pDry(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], threshold: float=0) -> float:
     wet_time = 0
     for i in range(len(time)-1):
         if intensity[i] > threshold:
@@ -428,23 +424,28 @@ def _mrle_pDry(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 def _mrle_rescale(
     time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], scale: float
 ):
-    n = len(time) - 1
-    scale_time = np.zeros(n*3+2)
-    scale_intensity = np.zeros(n*3+2)
+    time_index = len(time) - 1
+    scale_time = np.zeros(time_index*3+2)
+    scale_intensity = np.zeros(time_index*3+2)
 
     scale_time[0] = -1
     rescale_idx = 1
-    for i in range(n):
+    for i in range(time_index):
         srt, end = time[i], time[i+1]
-        r_srt, r_end = srt//scale, (end - 1)//scale
+        r_srt, r_end = srt//scale, (end-1)//scale
         intensity_i = intensity[i]
+
+#original:      |------------|
+#rescale:            |----|
         if r_srt == r_end:
             if scale_time[rescale_idx - 1] == r_srt:
                 rescale_idx -= 1
             scale_time[rescale_idx] = r_srt
             scale_intensity[rescale_idx] += intensity_i*(end-srt)
             rescale_idx += 1
-        
+
+#original:      |------------|
+#rescale:   |---------|
         if r_srt + 1 == r_end:
             if scale_time[rescale_idx - 1] == r_srt:
                 rescale_idx -= 1
@@ -455,6 +456,8 @@ def _mrle_rescale(
             scale_intensity[rescale_idx] += intensity_i*((end-1) % scale + 1)
             rescale_idx += 1
 
+#original:      |------------|
+#rescale:   |--------------------|
         if r_srt + 1 < r_end:
             if scale_time[rescale_idx - 1] == r_srt:
                 rescale_idx -= 1
