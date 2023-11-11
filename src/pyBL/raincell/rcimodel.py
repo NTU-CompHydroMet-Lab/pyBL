@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Protocol, overload, runtime_checkable, Union, List
+from typing import Optional, Protocol, Union, overload, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
@@ -18,6 +18,14 @@ class IConstantRCI(Protocol):
             self.rng = rng
         else:
             self.rng = np.random.default_rng(rng)  # type: ignore
+
+    def set_rng(self, rng: Optional[np.random.Generator] = None) -> None:
+        if rng is None:
+            self.rng = np.random.default_rng()
+        elif isinstance(rng, np.random.Generator):
+            self.rng = rng
+        else:
+            self.rng = np.random.default_rng(rng)
 
     def get_f1(self, sigmax_mux: float) -> float:
         ...
