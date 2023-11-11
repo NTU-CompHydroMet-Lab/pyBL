@@ -167,6 +167,11 @@ class IntensityMRLE:
     def __str__(self) -> str:
         time_value = "\n".join(f'{self.time[i]:>5.7f} {self.intensity[i]:>5.7f}' for i in range(len(self.time)))
         return time_value
+    
+    def total(self) -> float:
+        if self._time.size == 0:
+            return 0
+        return _mrle_total(self._time, self._intensity)
 
     def mean(self) -> float:
         if self._time.size == 0:
@@ -197,8 +202,6 @@ class IntensityMRLE:
         if self._time.size == 0:
             return type(self)(scale=self._scale * scale)
         scale_time, scale_intensity = _mrle_rescale(self._time, self._intensity, scale)
-        print(f'This is {self._scale}')
-        print("".join(f'{scale_time[i]:>5.7f} {scale_intensity[i]:>5.7f}\n' for i in range(len(scale_time))))
         return type(self)(scale_time, scale_intensity, self._scale * scale)
 
     def unpack(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -331,9 +334,12 @@ def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
 
     return IntensityMRLE(time, intensity, a._scale)
 
-def _mrle_mean(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
+def _mrle_total(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
     each_intensity_duration = np.diff(time)
-    return np.sum(intensity[:-1] * each_intensity_duration) / (time[-1] - time[0])
+    return np.sum(intensity[:-1] * each_intensity_duration)
+
+def _mrle_mean(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
+    return _mrle_total(time, intensity) / (time[-1] - time[0])
 
 def _mrle_acf(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], lag=1, mean = None, sse = None):
     if lag == 0:
@@ -428,39 +434,38 @@ def _mrle_rescale(
     scale_time = np.zeros(time_index*3+2)
     scale_intensity = np.zeros(time_index*3+2)
 
-    scale_time[0] = -1
+    scale_time[0] = np.nan
     rescale_idx = 1
     for i in range(time_index):
         srt, end = time[i], time[i+1]
-        r_srt, r_end = srt//scale, (end-1)//scale
+        r_srt, r_end = srt//scale, end//scale
         intensity_i = intensity[i]
 
-#original:      |------------|
-#rescale:            |----|
+        if scale_time[rescale_idx - 1] == r_srt:
+            rescale_idx -= 1
+
+        #original:      |------------|
+        #rescale:            |----|
         if r_srt == r_end:
-            if scale_time[rescale_idx - 1] == r_srt:
-                rescale_idx -= 1
             scale_time[rescale_idx] = r_srt
             scale_intensity[rescale_idx] += intensity_i*(end-srt)
             rescale_idx += 1
 
-#original:      |------------|
-#rescale:   |---------|
+        #original:      |------------|
+        #           | A |  B  |
+        #rescale:   |---------|
         if r_srt + 1 == r_end:
-            if scale_time[rescale_idx - 1] == r_srt:
-                rescale_idx -= 1
             scale_time[rescale_idx] = r_srt
             scale_intensity[rescale_idx] += intensity_i*(scale - srt % scale)
             rescale_idx += 1
             scale_time[rescale_idx] = r_end
-            scale_intensity[rescale_idx] += intensity_i*((end-1) % scale + 1)
+            scale_intensity[rescale_idx] += intensity_i*(end % scale)
             rescale_idx += 1
 
-#original:      |------------|
-#rescale:   |--------------------|
+        #original:      |------------|
+        #           | A |     B      | C |
+        #rescale:   |--------------------|
         if r_srt + 1 < r_end:
-            if scale_time[rescale_idx - 1] == r_srt:
-                rescale_idx -= 1
             scale_time[rescale_idx] = r_srt
             scale_intensity[rescale_idx] += intensity_i*(scale - srt % scale)
             rescale_idx += 1
@@ -468,11 +473,18 @@ def _mrle_rescale(
             scale_intensity[rescale_idx] += intensity_i*scale
             rescale_idx += 1
             scale_time[rescale_idx] = r_end
-            scale_intensity[rescale_idx] += intensity_i*((end-1) % scale + 1)
+            scale_intensity[rescale_idx] += intensity_i*(end % scale)
             rescale_idx += 1
 
-    scale_time[rescale_idx] = scale_time[rescale_idx - 1] + 1
-    scale_intensity[rescale_idx] = np.nan
+    # Append the ending time with nan intensity
+    # If the last rescaled time is the same as the last original time, change it to nan.
+    if scale_time[rescale_idx - 1] == time[-1]/scale:
+        scale_intensity[rescale_idx - 1] = np.nan
+        rescale_idx -= 1
+    else:
+        scale_time[rescale_idx] = scale_time[rescale_idx - 1] + 1
+        scale_intensity[rescale_idx] = np.nan
+    
     scale_time = scale_time[1:rescale_idx+1]
     scale_intensity = scale_intensity[1:rescale_idx+1]
 
