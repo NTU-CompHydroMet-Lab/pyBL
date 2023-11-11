@@ -108,7 +108,7 @@ def calculateWeight(monthlyData, sinStaProp, pDryThreshold=0):
 
     # Check if monthlyData is Jan
     if monthlyData.index.month.unique() == 1 and sinStaProp == "AR-1":
-        print(f"Monthly data is Jan")
+        print("Monthly data is Jan")
         print(monthlyData[monthlyData.index.year == 1987].values)
         print(cal_AR1(monthlyData[monthlyData.index.year == 1987]))
 

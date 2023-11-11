@@ -14,5 +14,5 @@ fitting:
 sampling:
   month: 1
   start_time: '2020-01-01'
-  end_time: '2020-12-31'
+  end_time: '2120-12-31'
   freq: '1h'

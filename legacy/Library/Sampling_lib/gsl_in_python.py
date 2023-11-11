@@ -1,6 +1,8 @@
 import math
+
 import zignor
-from scipy.stats import expon, randint, uniform
+from scipy.stats import uniform
+
 
 def uniform_pos():
     # This function returns a positive double precision floating point number

@@ -1,10 +1,10 @@
 import math
 from datetime import datetime
 
-import scipy.special as sc
-
-from Library.Fitting_lib.IntensityModel.model import (exponential_RCI_model,
-                                                      gamma_RCI_model)
+from Library.Fitting_lib.IntensityModel.model import (
+    exponential_RCI_model,
+    gamma_RCI_model,
+)
 
 
 class BLRPRx:
@@ -183,7 +183,7 @@ class BLRPRx:
         muc = 1.0 + kappa / phi
 
         phi2 = phi * phi
-        phi3 = phi * phi2
+        phi * phi2
 
         r = theta[3]
         f1 = self.RCI_model.get_f1(r)

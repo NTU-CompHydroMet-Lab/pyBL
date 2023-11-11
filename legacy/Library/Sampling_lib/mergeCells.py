@@ -1,5 +1,3 @@
-import datetime
-import math
 from datetime import datetime as dt
 from datetime import timedelta as td
 
@@ -29,6 +27,7 @@ def MergeCells(storms, freq):
     ).replace(microsecond=0)
 
     whole_duration = max_time - min_time
+    print(whole_duration)
     blanks = int(whole_duration.total_seconds())
     ts = np.zeros((blanks + 1))
 
@@ -38,7 +37,6 @@ def MergeCells(storms, freq):
             e = int((cell.eDT.replace(microsecond=0) - min_time).total_seconds())
             real_depth_per_second = cell.Depth / 3600
             ts[s:e] += real_depth_per_second
-    ind_time = min_time
 
     time_index = pd.date_range(min_time, max_time, freq="S")
     rainfall_ts = pd.Series(ts, index=time_index).resample(freq).sum()

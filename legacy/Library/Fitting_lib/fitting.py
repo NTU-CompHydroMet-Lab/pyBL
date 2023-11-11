@@ -1,13 +1,13 @@
-import math
 import random
 
 import numpy as np
 import pandas as pd
-import scipy.special as sc
-from scipy.optimize import (basinhopping, differential_evolution,
-                            dual_annealing, minimize, shgo)
-
 from Library.BLRPRmodel.BLRPRx import *
+from scipy.optimize import (
+    basinhopping,
+    dual_annealing,
+    minimize,
+)
 
 np.random.seed(1340)
 
@@ -68,13 +68,13 @@ def Annealing(
     :param weightFile_path: string, the file path of the weight(uncertainty) of the statistical properties
     :return (theta, ret.fun): (list, float), the dict contains the optimized theta and the score for checking if the optimizatiom is correct
     """
-    if obj_func == None:
+    if obj_func is None:
         return -9999
 
     n_theta = len(theta)
 
-    xp0 = [item for item in theta if item >= 0]
-    r = random.random()
+    [item for item in theta if item >= 0]
+    random.random()
 
     lw = [1e-6] * n_theta
     up = [20] * n_theta
@@ -123,13 +123,13 @@ def Basinhopping(
     :param weightFile_path: string, the file path of the weight(uncertainty) of the statistical properties
     :return (theta, ret.fun), (list, float), the dict contains the optimized theta and the score for checking if the optimizatiom is correct
     """
-    if obj_func == None:
+    if obj_func is None:
         return -9999
 
     n_theta = len(theta)
 
-    xp0 = [item for item in theta if item >= 0]
-    r = random.random()
+    [item for item in theta if item >= 0]
+    random.random()
 
     lw = [1e-6] * n_theta
     up = [20] * n_theta
@@ -175,7 +175,7 @@ def Nelder_Mead(
     :param weightFile_path: string, the file path of the weight(uncertainty) of the statistical properties
     :return theta: list, the optimized theta
     """
-    if obj_func == None:
+    if obj_func is None:
         return -9999
 
     n_theta = len(theta)

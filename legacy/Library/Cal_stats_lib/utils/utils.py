@@ -1,9 +1,7 @@
-import argparse
 
 import numpy as np
 import pandas as pd
-import yaml
-from scipy.stats import moment, skew, variation
+from scipy.stats import skew, variation
 
 
 def change_timescale(target_dataframe, scale):

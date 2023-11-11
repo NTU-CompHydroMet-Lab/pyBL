@@ -1,8 +1,3 @@
-import datetime
-import os
-import random
-import warnings
-from calendar import month_abbr
 from datetime import datetime as dt
 from datetime import timedelta as td
 
@@ -10,16 +5,16 @@ import numpy as np
 import pandas as pd
 import yaml
 from dotmap import DotMap
-from scipy.stats import poisson
-
 from Library.BLRPRmodel.BLRPRx import *
 from Library.Cal_stats_lib.utils.stats_calculation import *
 from Library.Cal_stats_lib.utils.utils import *
-from Library.Sampling_lib.gsl_in_python import gamma
 from Library.Sampling_lib.mergeCells import *
 from Library.Sampling_lib.sampling import *
+from scipy.stats import poisson
 
 from .storm import *
+
+gamma = np.random.gamma
 
 args = yaml.load(open("./config/default.yaml"), Loader=yaml.FullLoader)
 args = DotMap(args)
