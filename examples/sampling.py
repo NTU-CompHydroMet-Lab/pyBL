@@ -4,11 +4,10 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
+## Experiment configuration
 sample_size = 1000
 sample_duration = 1000000
-
 rng = np.random.default_rng()
-
 params = BLRPRx_params(
     lambda_=0.016679733103341976,
     phi=0.08270236178820184,
@@ -20,6 +19,7 @@ params = BLRPRx_params(
 )
 model = BLRPRx(params=params, rng=rng)
 
+## Calculate the theoretical mean, cvar, ar1, skewness
 model_df = pd.DataFrame(
     columns=["Mean", "CVaR", "AR1", "Skewness"], index=[1, 3, 6, 24]
 )
@@ -31,13 +31,13 @@ for i, scale in enumerate([1, 3, 6, 24]):
         prop=Stat_Props.SKEWNESS, timescale=scale
     )
 
+## Start sampling
 result_df = np.empty(sample_size, dtype=object)
-
+result = np.empty((sample_size, 4, 4), dtype=np.float64)
 for exp in range(sample_size):
     ts = model.sample(sample_duration)
     ts_rescale = [ts.rescale(1), ts.rescale(3), ts.rescale(6), ts.rescale(24)]
 
-    # Generate a pandas dataframe with Mean, CVaR, AR1, Skewness as columns and 1h, 3h, 6h, 24h as rows
     result_df[exp] = pd.DataFrame(
         columns=["Mean", "CVaR", "AR1", "Skewness"], index=[1, 3, 6, 24]
     )
@@ -48,13 +48,9 @@ for exp in range(sample_size):
         result_df[exp].loc[scale, "AR1"] = ts_rescale[i].acf(1)
         result_df[exp].loc[scale, "Skewness"] = ts_rescale[i].skewness()
 
-    # Print the results
-    print(f"Result: \n{result_df[exp]}\n")
+    result[exp] = result_df[exp].to_numpy()
 
-result = np.empty((sample_size, 4, 4), dtype=np.float64)
-for i in range(sample_size):
-    result[i] = result_df[i].to_numpy()
-
+## Plot the results
 for i, scale in enumerate([1, 3, 6, 24]):
     # Plot bin chart for mean, cvar, ar1, skewness
     fig, axs = plt.subplots(2, 2)
