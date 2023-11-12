@@ -6,8 +6,11 @@ from typing import Optional, Tuple
 import numpy as np
 import numpy.typing as npt
 import scipy as sp  # type: ignore
+import math
 
-from pyBL.models import BaseBLRP, BaseBLRP_RCIModel, BL_Props
+from pyBL.models import BaseBLRP, BaseBLRP_RCIModel, Stat_Props
+from pyBL.timeseries import IntensityMRLE
+import numba as nb
 
 
 @dataclass
@@ -23,7 +26,10 @@ class BLRPRx_params:
 
     def size(self):
         return 7
-    def unpack(self) -> Tuple[float, float, float, float, float, float, float,]:
+
+    def unpack(
+        self,
+    ) -> Tuple[float, float, float, float, float, float, float,]:
         return (
             self.lambda_,
             self.phi,
@@ -34,20 +40,20 @@ class BLRPRx_params:
             self.iota,
         )
 
+    def copy(self) -> BLRPRx_params:
+        return BLRPRx_params(*self.unpack())
+
 
 class BLRPRx(BaseBLRP):
     ## This BLRPRx is an implementation of Kaczmarska et al. (2014)
     __slots__ = (
         "rci_model",
         "rng",
-        # "params",
-        "lambda_",
-        "phi",
-        "kappa",
-        "alpha",
-        "nu",
-        "sigmax_mux",
-        "iota",
+        "params",
+        "cache_mean",
+        "cache_variance",
+        "cache_covariance",
+        "cache_moment_3rd",
     )
 
     def __init__(
@@ -57,103 +63,119 @@ class BLRPRx(BaseBLRP):
         rci_model: BaseBLRP_RCIModel = None,
     ) -> None:
         super().__init__(rng, rci_model)
-        # self.params: BLRPRx_params = BLRPRx_params(
-        #    lambda_=0.1, phi=0.1, kappa=0.1, alpha=0.1, nu=0.1, sigmax_mux=0.1, iota=0.1,
-        # )
-
         # If user does not provide params, give the default values.
-        self.lambda_: float = params.lambda_ if params is not None else 0.016679
-        self.phi: float = params.phi if params is not None else 0.082
-        self.kappa: float = params.kappa if params is not None else 0.349
-        self.alpha: float = params.alpha if params is not None else 9.01
-        self.nu: float = params.nu if params is not None else 10
-        self.sigmax_mux: float = params.sigmax_mux if params is not None else 1
-        self.iota: float = params.iota if params is not None else 0.97
+        if params is None:
+            self.params = BLRPRx_params(
+                lambda_=0.016679,
+                phi=0.082,
+                kappa=0.349,
+                alpha=9.01,
+                nu=10,
+                sigmax_mux=1,
+                iota=0.97,
+            )
+        else:
+            self.params = params.copy()
+
+        self.cache_mean = {}
+        self.cache_variance = {}
+        self.cache_covariance = {}
+        self.cache_moment_3rd = {}
 
     def copy(self, rng: Optional[np.random.Generator] = None) -> BLRPRx:
         if rng is None:
             rng = np.random.default_rng(self.rng)
 
         return BLRPRx(
-            params=self.params(),
+            params=self.get_params(),
             rng=rng,
-            rci_model=type(self.rci_model)(rng=rng),
+            rci_model=type(self.rci_model)(),
         )
 
-    def params(self) -> BLRPRx_params:
-        return BLRPRx_params(
-            lambda_=self.lambda_,
-            phi=self.phi,
-            kappa=self.kappa,
-            alpha=self.alpha,
-            nu=self.nu,
-            sigmax_mux=self.sigmax_mux,
-            iota=self.iota,
-        )
+    def get_params(self) -> BLRPRx_params:
+        return self.params.copy()
 
     def update_params(self, params: BLRPRx_params) -> None:
-        self.lambda_ = params.lambda_
-        self.phi = params.phi
-        self.kappa = params.kappa
-        self.alpha = params.alpha
-        self.nu = params.nu
-        self.sigmax_mux = params.sigmax_mux
-        self.iota = params.iota
+        self.params = params.copy()
+        self.cache_mean = {}
+        self.cache_variance = {}
+        self.cache_covariance = {}
+        self.cache_moment_3rd = {}
 
     def _kernel(self, k: float, u: float, nu: float, alpha: float) -> float:
         return _blrprx_kernel(k, u, nu, alpha)
 
     def mean(self, timescale: float = 1.0) -> float:
-        return _blrprx_mean(timescale, *self.params().unpack())
+        if timescale not in self.cache_mean:
+            self.cache_mean[timescale] = _blrprx_mean(
+                timescale, *self.get_params().unpack()
+            )
+        return self.cache_mean[timescale]
 
     def variance(self, timescale: float = 1.0) -> float:
-        f1 = self.rci_model.get_f1(sigmax_mux=self.sigmax_mux)
-        return _blrprx_variance(
-            timescale,
-            *self.params().unpack(),
-            f1,
-        )
+        f1 = self.rci_model.get_f1(sigmax_mux=self.params.sigmax_mux)
+        if timescale not in self.cache_variance:
+            self.cache_variance[timescale] = _blrprx_variance(
+                timescale,
+                *self.get_params().unpack(),
+                f1,
+            )
+        return self.cache_variance[timescale]
 
     def covariance(self, timescale: float = 1.0, lag: float = 1.0) -> float:
-        f1 = self.rci_model.get_f1(sigmax_mux=self.sigmax_mux)
-        return _blrprx_covariance(timescale, *self.params().unpack(), f1, lag)
+        f1 = self.rci_model.get_f1(sigmax_mux=self.params.sigmax_mux)
+        if timescale not in self.cache_covariance:
+            self.cache_covariance[timescale] = _blrprx_covariance(
+                timescale,
+                *self.get_params().unpack(),
+                f1,
+                lag,
+            )
+        return self.cache_covariance[timescale]
 
     def moment_3rd(self, timescale: float = 1.0) -> float:
-        f1 = self.rci_model.get_f1(sigmax_mux=self.sigmax_mux)
-        f2 = self.rci_model.get_f2(sigmax_mux=self.sigmax_mux)
-        return _blrprx_moment_3rd(timescale, *self.params().unpack(), f1, f2)
+        f1 = self.rci_model.get_f1(sigmax_mux=self.params.sigmax_mux)
+        f2 = self.rci_model.get_f2(sigmax_mux=self.params.sigmax_mux)
+        if timescale not in self.cache_moment_3rd:
+            self.cache_moment_3rd[timescale] = _blrprx_moment_3rd(
+                timescale,
+                *self.get_params().unpack(),
+                f1,
+                f2,
+            )
+        return self.cache_moment_3rd[timescale]
 
     def get_prop(
         self,
-        prop: BL_Props,
+        prop: Stat_Props,
         timescale: float = 1.0,
     ) -> float:
-        if prop == BL_Props.MEAN:
+        if prop == Stat_Props.MEAN:
             return self.mean(timescale)
-        elif prop == BL_Props.VAR:
+        elif prop == Stat_Props.VAR:
             return self.variance(timescale)
-        elif prop == BL_Props.CVAR:
+        elif prop == Stat_Props.CVAR:
             return np.sqrt(self.variance(timescale)) / self.mean(timescale)
-        elif prop == BL_Props.AR1:
+        elif prop == Stat_Props.AR1:
             return self.covariance(timescale, 1.0) / self.variance(timescale)
-        elif prop == BL_Props.AR2:
+        elif prop == Stat_Props.AR2:
             return self.covariance(timescale, 2.0) / self.variance(timescale)
-        elif prop == BL_Props.AR3:
+        elif prop == Stat_Props.AR3:
             return self.covariance(timescale, 3.0) / self.variance(timescale)
-        elif prop == BL_Props.AC1:
+        elif prop == Stat_Props.AC1:
             return self.covariance(timescale, 1.0)
-        elif prop == BL_Props.AC2:
+        elif prop == Stat_Props.AC2:
             return self.covariance(timescale, 2.0)
-        elif prop == BL_Props.AC3:
+        elif prop == Stat_Props.AC3:
             return self.covariance(timescale, 3.0)
-        elif prop == BL_Props.SKEWNESS:
+        elif prop == Stat_Props.SKEWNESS:
             return self.moment_3rd(timescale) / np.power(self.variance(timescale), 1.5)
         else:
             # Not implemented properties
             return 0.0
 
-    def sample(self, duration_hr: float) -> npt.NDArray[np.float64]:
-        lambda_, phi, kappa, alpha, nu, sigmax_mux, iota = self.params().unpack()
+    def sample_raw(self, duration_hr: float) -> npt.NDArray[np.float64]:
+        lambda_, phi, kappa, alpha, nu, sigmax_mux, iota = self.get_params().unpack()
         rng = self.rng
 
         # Storm number sampling
@@ -196,7 +218,7 @@ class BLRPRx(BaseBLRP):
             cell_intensities[
                 cells_start_idx : cells_start_idx + n_cells_per_storm[i]
             ] = self.rci_model.sample_intensity(
-                mux=mux[i], sigmax_mux=sigmax_mux, n_cells=n_cells_per_storm[i]
+                rng=rng, mux=mux[i], sigmax_mux=sigmax_mux, n_cells=n_cells_per_storm[i]
             )
             cells_start_idx += n_cells_per_storm[i]
 
@@ -209,26 +231,39 @@ class BLRPRx(BaseBLRP):
 
         return cell_arr
 
+    def sample(self, duration_hr: float) -> IntensityMRLE:
+        cell_arr = self.sample_raw(duration_hr)
+        delta = np.concatenate(
+            [
+                np.stack([cell_arr[:, 0], cell_arr[:, 2]]).T,
+                np.stack([cell_arr[:, 1], -cell_arr[:, 2]]).T,
+            ],
+            axis=0,
+        )
+        return IntensityMRLE.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
 
+
+@nb.njit
 def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
     # Modelling rainfall with a Bartlett–Lewis process: new developments(2020) Formula (5)
 
-    # TODO: Check if this is still required.
-    if alpha <= 4.0 and np.modf(alpha)[0] == 0.0:
-        alpha += 1.0e-8
+    ## TODO: Check if this is still required.
+    # if alpha <= 4.0 and np.modf(alpha)[0] == 0.0:
+    #    alpha += 1.0e-8
 
-    # TODO: Check if this is still required.
-    if alpha - k >= 171.0 or alpha >= 171.0:
-        return np.inf
+    ## TODO: Check if this is still required.
+    # if alpha - k >= 171.0 or alpha >= 171.0:
+    #    return np.inf
 
     return (
         np.power(nu / (nu + u), alpha)
         * np.power(nu + u, k)
-        * sp.special.gamma(alpha - k)
-        / sp.special.gamma(alpha)
+        * math.gamma(alpha - k)
+        / math.gamma(alpha)
     )
 
 
+@nb.njit
 def _blrprx_mean(
     timescale: float,
     lambda_: float,
@@ -236,7 +271,7 @@ def _blrprx_mean(
     kappa: float,
     alpha: float,
     nu: float,
-    sigma_mux: float,
+    sigmax_mux: float,
     iota: float,
 ):
     mu_c = 1.0 + kappa / phi
@@ -244,6 +279,7 @@ def _blrprx_mean(
     return timescale * lambda_ * iota * mu_c * _blrprx_kernel(0, 0, nu, alpha)
 
 
+@nb.njit
 def _blrprx_variance(
     timescale: float,
     lambda_: float,
@@ -251,7 +287,7 @@ def _blrprx_variance(
     kappa: float,
     alpha: float,
     nu: float,
-    sigma_mux: float,
+    sigmax_mux: float,
     iota: float,
     f1: float,
 ):
@@ -275,6 +311,7 @@ def _blrprx_variance(
     )
 
 
+@nb.njit
 def _blrprx_covariance(
     timescale: float,
     lambda_: float,
@@ -282,7 +319,7 @@ def _blrprx_covariance(
     kappa: float,
     alpha: float,
     nu: float,
-    sigma_mux: float,
+    sigmax_mux: float,
     iota: float,
     f1: float,
     k: float,
@@ -308,6 +345,7 @@ def _blrprx_covariance(
     return lambda_ * mu_c * iota**2 * (cov_part1 - cov_part2)
 
 
+@nb.njit
 def _blrprx_moment_3rd(
     timescale: float,
     lambda_: float,
@@ -315,7 +353,7 @@ def _blrprx_moment_3rd(
     kappa: float,
     alpha: float,
     nu: float,
-    sigma_mux: float,
+    sigmax_mux: float,
     iota: float,
     f1: float,
     f2: float,

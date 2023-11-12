@@ -10,6 +10,7 @@ from typing import (
 
 import numpy as np
 import numpy.typing as npt
+import numba as nb
 
 __all__ = ["IntensityMRLE"]
 
@@ -334,13 +335,16 @@ def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
 
     return IntensityMRLE(time, intensity, a._scale)
 
+@nb.njit
 def _mrle_total(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
     each_intensity_duration = np.diff(time)
     return np.sum(intensity[:-1] * each_intensity_duration)
 
+@nb.njit
 def _mrle_mean(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
     return _mrle_total(time, intensity) / (time[-1] - time[0])
 
+@nb.njit
 def _mrle_acf(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], lag=1, mean = None, sse = None):
     if lag == 0:
         return 1
@@ -378,6 +382,7 @@ def _mrle_acf(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64],
             y_idx += 1
     return result / sse
 
+@nb.njit
 def _mrle_cvar(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, ddof = 0) -> float:
     # Coefficient of variation
     if mean is None:
@@ -393,6 +398,7 @@ def _mrle_cvar(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 
     return (sse / (time[-1] - time[0] - ddof))**0.5 / mean
 
+@nb.njit
 def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, biased_sd = False) -> float:
     # Skewness
     n = time[-1] - time[0]
@@ -427,6 +433,7 @@ def _mrle_pDry(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 
     return 1 - (wet_time / (time[-1] - time[0]))
 
+@nb.njit
 def _mrle_rescale(
     time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], scale: float
 ):
@@ -488,13 +495,11 @@ def _mrle_rescale(
     scale_time = scale_time[1:rescale_idx+1]
     scale_intensity = scale_intensity[1:rescale_idx+1]
 
-    # Preallocate array
-    diff_time = np.array([True] * (len(scale_time)))
+    # Preallocate boolean array
+    diff_time = np.ones(len(scale_time), dtype=np.bool_)
     for i in range(1, len(scale_time)):
         diff_time[i] = (scale_intensity[i] != scale_intensity[i-1])
     diff_time[0] = True
 
-    scale_time = scale_time[diff_time]
-    scale_intensity = scale_intensity[diff_time]
+    return scale_time[diff_time] , scale_intensity[diff_time]
 
-    return scale_time , scale_intensity

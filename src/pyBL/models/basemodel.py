@@ -6,20 +6,21 @@ from typing import Optional, Protocol, Type, Union
 
 import numpy as np
 import scipy as sp  # type: ignore
+import math
 
 from pyBL.raincell import ExponentialRCIModel, IConstantRCI
 
 BaseBLRP_RCIModel = Optional[Union[IConstantRCI, Type[IConstantRCI]]]
 
 
-class BL_Props(Enum):
-    MEAN = 0        # Mean
-    CVAR = 1        # Coefficient of variation
-    SKEWNESS = 2    # Skewness
-    AR1 = 3         # Autocorrelation coefficient lag 1
-    AR2 = 4         # Autocorrelation coefficient lag 2
-    AR3 = 5         # Autocorrelation coefficient lag 3
-    pDRY = 6        # Probability of dry
+class Stat_Props(Enum):
+    MEAN = 0  # Mean
+    CVAR = 1  # Coefficient of variation
+    SKEWNESS = 2  # Skewness
+    AR1 = 3  # Autocorrelation coefficient lag 1
+    AR2 = 4  # Autocorrelation coefficient lag 2
+    AR3 = 5  # Autocorrelation coefficient lag 3
+    pDRY = 6  # Probability of dry
     MSIT = 7
     MSD = 8
     MCIT = 9
@@ -27,9 +28,9 @@ class BL_Props(Enum):
     MCS = 11
     MPC = 12
     VAR = 13
-    AC1 = 14        # Autocorrelation lag 1 (Just covariance with different lags)
-    AC2 = 15        # Autocorrelation lag 2 (Just covariance with different lags)
-    AC3 = 16        # Autocorrelation lag 3 (Just covariance with different lags)
+    AC1 = 14  # Autocorrelation lag 1 (Just covariance with different lags)
+    AC2 = 15  # Autocorrelation lag 2 (Just covariance with different lags)
+    AC3 = 16  # Autocorrelation lag 3 (Just covariance with different lags)
 
 
 class BaseBLRP(Protocol):
@@ -49,11 +50,11 @@ class BaseBLRP(Protocol):
             self.rng = np.random.default_rng(rng)  # type: ignore
 
         if rci_model is None:
-            self.rci_model = ExponentialRCIModel(self.rng)
+            self.rci_model = ExponentialRCIModel()
         elif isinstance(rci_model, IConstantRCI):
             self.rci_model = rci_model
         elif isinstance(rci_model(), IConstantRCI):
-            self.rci_model = rci_model(self.rng)
+            self.rci_model = rci_model()
         else:
             raise TypeError("rci_model must be a implementation of IConstantRCI")
 
@@ -107,8 +108,8 @@ class BLRPR(BaseBLRP):
         return (
             np.power(nu / (nu + x), alpha)
             * np.power(nu + x, k)
-            * sp.special.gamma(alpha - k)
-            / sp.special.gamma(alpha)
+            * math.gamma(alpha - k)
+            / math.gamma(alpha)
         )
 
     def mean(self, timescale: float) -> float:
