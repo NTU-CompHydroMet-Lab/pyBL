@@ -1,7 +1,7 @@
 import numpy as np
 from Library.BLRPRmodel.BLRPRx import BLRPRx as LEGACY_BLRPRx
 
-from pyBL.models import Stat_Props
+from pyBL.models import Stat_Propsps
 from pyBL.models import BLRPRx as NEW_BLRPRx
 
 theta = [
@@ -27,4 +27,4 @@ print()
 print(new_model.mean())
 print(new_model.covariance())
 print(new_model.variance())
-print(new_model.get_prop(Stat_Props.CVAR))
+print(new_model.get_prop(Stat_Propsps.CVAR))

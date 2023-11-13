@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 
 from pyBL.fitting.fitter import BLRPRxFitter
-from pyBL.models import Stat_Props, BLRPRx, BLRPRx_params
+from pyBL.models import Stat_Propsps, BLRPRx, BLRPRx_params
 from pyBL.timeseries import IntensityMRLE
 
 timescale = [1, 3600, 3 * 3600, 6 * 3600, 24 * 3600]
-props = [
+props = [Stat_PropsStat_PropsStat_PropsStat_PropsStat_Props
     Stat_Props.MEAN,
     Stat_Props.CVAR,
     Stat_Props.AR1,
