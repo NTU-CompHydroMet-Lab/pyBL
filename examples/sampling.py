@@ -1,5 +1,4 @@
 from pyBL.models import BLRPRx, Stat_Props, BLRPRx_params
-from pyBL.timeseries import IntensityMRLE
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -17,7 +16,7 @@ params = BLRPRx_params(
     sigmax_mux=1.0,
     iota=0.971862948182735,
 )
-model = BLRPRx(params=params, rng=rng)
+model = BLRPRx(params=params, sampling_rng=rng)
 
 ## Calculate the theoretical mean, cvar, ar1, skewness
 model_df = pd.DataFrame(
@@ -36,7 +35,11 @@ result_df = np.empty(sample_size, dtype=object)
 result = np.empty((sample_size, 4, 4), dtype=np.float64)
 for exp in range(sample_size):
     ts = model.sample(sample_duration)
-    ts_rescale = [ts.rescale(1), ts.rescale(3), ts.rescale(6), ts.rescale(24)]
+    ts_rescale = []
+    ts_rescale.append(ts.rescale(1))
+    ts_rescale.append(ts_rescale[0].rescale(3))
+    ts_rescale.append(ts_rescale[1].rescale(2))
+    ts_rescale.append(ts_rescale[2].rescale(4))
 
     result_df[exp] = pd.DataFrame(
         columns=["Mean", "CVaR", "AR1", "Skewness"], index=[1, 3, 6, 24]
@@ -74,4 +77,5 @@ for i, scale in enumerate([1, 3, 6, 24]):
         f'Skewness, median={np.median(result[:, i, 3]):.5f}, theoretical={model_df.loc[scale, "Skewness"]:.5f}'
     )
     fig.tight_layout()
-    plt.show()
+    plt.savefig(f"scale_{scale}.png")
+    plt.close()
