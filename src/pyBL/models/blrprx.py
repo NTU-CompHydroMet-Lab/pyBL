@@ -59,10 +59,10 @@ class BLRPRx(BaseBLRP):
     def __init__(
         self,
         params: Optional[BLRPRx_params] = None,
-        rng: Optional[np.random.Generator] = None,
+        sampling_rng: Optional[np.random.Generator] = None,
         rci_model: BaseBLRP_RCIModel = None,
     ) -> None:
-        super().__init__(rng, rci_model)
+        super().__init__(sampling_rng, rci_model)
         # If user does not provide params, give the default values.
         if params is None:
             self.params = BLRPRx_params(
@@ -88,7 +88,7 @@ class BLRPRx(BaseBLRP):
 
         return BLRPRx(
             params=self.get_params(),
-            rng=rng,
+            sampling_rng=rng,
             rci_model=type(self.rci_model)(),
         )
 
