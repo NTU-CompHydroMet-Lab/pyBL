@@ -4,30 +4,45 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import dual_annealing
 
-from pyBL.models import BL_Props, BLRPRx, BLRPRx_params
+from pyBL.models import Stat_Props, BLRPRx, BLRPRx_params
 
 
 class BLRPRxFitter:
-    __slots__ = ("_model", "_props", "_props_size", "_enable_props_size", "_timescales", "_mask")
+    __slots__ = (
+        "_model",
+        "_props",
+        "_props_size",
+        "_enable_props_size",
+        "_timescales",
+        "_mask",
+    )
 
     def __init__(
         self,
-        props: Optional[List[BL_Props]] = None,
+        props: Optional[List[Stat_Props]] = None,
         timescales: Optional[npt.NDArray] = None,
         mask: Optional[npt.NDArray] = None,
     ):
-        self._props_size = len(BL_Props)
-        self._props = {member: False for member in BL_Props}
+        self._props_size = len(Stat_Props)
+        self._props = {member: False for member in Stat_Props}
 
-        if props is not None and not all(isinstance(prop, BL_Props) for prop in props):
-            raise ValueError("All elements in props must be of type BL_Props")
+        if props is not None and not all(
+            isinstance(prop, Stat_Props) for prop in props
+        ):
+            raise ValueError("All elements in props must be of type Stat_Props")
         elif props is not None and len(props) == 0:
             raise ValueError("props must not be empty")
         elif props is not None:
             for prop in props:
                 self._props[prop] = True
         else:
-            for prop in [BL_Props.MEAN, BL_Props.CVAR, BL_Props.AR1, BL_Props.SKEWNESS, BL_Props.pDRY]:
+            for prop in [
+                Stat_Props.MEAN,
+                Stat_Props.CVAR,
+                Stat_Props.AR1,
+                Stat_Props.SKEWNESS,
+                Stat_Props.pDRY,
+            ]:
                 self._props[prop] = True
 
         self._enable_props_size = sum(self._props.values())
@@ -68,18 +83,22 @@ class BLRPRxFitter:
     def props(self):
         return self._props
 
-    # This method decide which properties in BL_Props to use for fitting
-    def set_props(self, props: Union[List[BL_Props], BL_Props], mask: Optional[npt.ArrayLike] = None):
+    # This method decide which properties in Stat_Props to use for fitting
+    def set_props(
+        self,
+        props: Union[List[Stat_Props], Stat_Props],
+        mask: Optional[npt.ArrayLike] = None,
+    ):
         try:
             mask = np.array(mask, dtype=bool)
         except:
             raise ValueError("Mask must can be converted to numpy array of dtype=bool")
 
-        if isinstance(props, BL_Props):
+        if isinstance(props, Stat_Props):
             props = [props]
 
-        if not all(isinstance(prop, BL_Props) for prop in props):
-            raise ValueError("All elements in props must be of type BL_Props")
+        if not all(isinstance(prop, Stat_Props) for prop in props):
+            raise ValueError("All elements in props must be of type Stat_Props")
         if mask is None:
             for prop in props:
                 self._props[prop] = True
@@ -162,7 +181,12 @@ class BLRPRxFitter:
         for i, prop in enumerate(self._props):
             self._props[prop] = np.any(self._mask[:, i])
 
-    def fit(self, target: npt.ArrayLike, weight: npt.ArrayLike, model: Optional[BLRPRx]=None):
+    def fit(
+        self,
+        target: npt.ArrayLike,
+        weight: npt.ArrayLike,
+        model: Optional[BLRPRx] = None,
+    ):
         target_np = np.array(target, dtype=float)
         weight_np = np.array(weight, dtype=float)
 
@@ -177,9 +201,11 @@ class BLRPRxFitter:
             raise ValueError(
                 "Target must be of shape (len(timescales), len(enabled_props))"
             )
-        
+
         # Extract column of enabled props in mask.
-        enabled_mask = self._mask[:, [prop.value for prop in self._props if self._props[prop]]]
+        enabled_mask = self._mask[
+            :, [prop.value for prop in self._props if self._props[prop]]
+        ]
         # Apply mask on weight
         weight_np = weight_np * enabled_mask
 
@@ -196,7 +222,7 @@ class BLRPRxFitter:
             x0=x0.unpack(),
             maxiter=1000,
             args=(target_np, weight_np, model),
-            seed=0
+            seed=0,
         )
         BLRPRx_params(*result.x)
         return result, BLRPRx(BLRPRx_params(*result.x), rci_model=model.rci_model)
@@ -206,7 +232,7 @@ class BLRPRxFitter:
         x: BLRPRx_params,
         target: npt.ArrayLike,
         weight: npt.ArrayLike,
-        model: Optional[BLRPRx]=None,
+        model: Optional[BLRPRx] = None,
     ):
         if model is None:
             model = BLRPRx()
@@ -217,13 +243,13 @@ class BLRPRxFitter:
         weight_np = np.array(weight, dtype=float)
 
         # Extract column of enabled props in mask.
-        enabled_mask = self._mask[:, [prop.value for prop in self._props if self._props[prop]]]
+        enabled_mask = self._mask[
+            :, [prop.value for prop in self._props if self._props[prop]]
+        ]
         # Apply mask on weight
         weight_np = weight_np * enabled_mask
 
         return self._evauluate(x_, target, weight_np, model)
-        
-
 
     def _evauluate(
         self,
