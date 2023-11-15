@@ -2,6 +2,7 @@ from typing import List, Optional, Union
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 from scipy.optimize import dual_annealing
 
 from pyBL.models import Stat_Props, BLRPRx, BLRPRx_params
@@ -78,6 +79,9 @@ class BLRPRxFitter:
             if mask.shape != (len(self._timescales), len(self._props)):
                 raise ValueError("Mask must be of shape (len(props), len(timescales))")
             self._mask = mask
+
+    def template(self):
+        pass
 
     @property
     def props(self):
@@ -267,3 +271,25 @@ class BLRPRxFitter:
                     result[i, prop.value] = model.get_prop(prop, ts)
         diff = np.sum(np.power(result - target, 2) * weight)
         return diff
+
+class BLRPRxFitter_pd:
+    __slots__ = (
+        "_mask",
+        "_weight",
+        "_target"
+    )
+    def __init__(
+        self,
+        mask: pd.DataFrame,
+        weight: pd.DataFrame,
+        target: pd.DataFrame,
+    ):
+        # Check the format of mask, weight and target
+         
+        
+
+    @classmethod
+    def template(cls):
+        # Create a pandas dataframe with Stat_Props as columns one row with timescales=1,3,6,24
+        template = pd.DataFrame(columns=[prop.name for prop in Stat_Props], index=[1,3,6,24], dtype=np.float64)
+        return template
