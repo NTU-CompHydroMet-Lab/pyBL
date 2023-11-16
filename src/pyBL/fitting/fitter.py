@@ -1,12 +1,14 @@
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import numba as nb
 from scipy.optimize import dual_annealing
 
 from pyBL.models import Stat_Props, BLRPRx, BLRPRx_params
-
+from pyBL.models.blrprx import _blrprx_covariance, _blrprx_mean, _blrprx_variance, _blrprx_moment_3rd, _blrprx_kernel
+from pyBL.raincell import IConstantRCI, ExponentialRCIModel
 
 class BLRPRxFitter:
     __slots__ = (
@@ -221,7 +223,7 @@ class BLRPRxFitter:
         x0 = model.get_params()
 
         result = dual_annealing(
-            self._evauluate,
+            self._evaluate,
             bounds=[(0.001, 20)] * x0.size(),
             x0=x0.unpack(),
             maxiter=1000,
@@ -253,9 +255,9 @@ class BLRPRxFitter:
         # Apply mask on weight
         weight_np = weight_np * enabled_mask
 
-        return self._evauluate(x_, target, weight_np, model)
+        return self._evaluate(x_, target, weight_np, model)
 
-    def _evauluate(
+    def _evaluate(
         self,
         x: npt.NDArray[np.float64],
         target: npt.ArrayLike,
@@ -269,27 +271,156 @@ class BLRPRxFitter:
             for prop in enabled_props:
                 if self._mask[i, prop.value]:
                     result[i, prop.value] = model.get_prop(prop, ts)
+        print(result)
         diff = np.sum(np.power(result - target, 2) * weight)
         return diff
 
-class BLRPRxFitter_pd:
+class BLRPRxConfig:
     __slots__ = (
         "_mask",
         "_weight",
-        "_target"
+        "_target",
+        "_rci_model"
     )
     def __init__(
         self,
-        mask: pd.DataFrame,
-        weight: pd.DataFrame,
         target: pd.DataFrame,
+        weight: pd.DataFrame,
+        mask: pd.DataFrame,
+        rci_model: Optional[IConstantRCI] = None,
     ):
-        # Check the format of mask, weight and target
-         
+        if not (target.shape == weight.shape == mask.shape):
+            raise ValueError("target, weight and mask must have the same shape")
         
+        # Check if they have the same set of column regardless of order
+        if not (set(target.columns) == set(weight.columns) == set(mask.columns)):
+            raise ValueError("target, weight and mask must have the same set of columns")
 
-    @classmethod
-    def template(cls):
+        # Check if they have the same set of index regardless of order
+        if not (set(target.index) == set(weight.index) == set(mask.index)):
+            raise ValueError("target, weight and mask must have the same set of index")
+        
+        # Make sure there isn't duplicate columns
+        if len(target.columns) != len(set(target.columns)) or len(weight.columns) != len(set(weight.columns)) or len(mask.columns) != len(set(mask.columns)):
+            raise ValueError("target, weight and mask must not have duplicate columns")
+
+        # Make sure there isn't duplicate index
+        if len(target.index) != len(set(target.index)) or len(weight.index) != len(set(weight.index)) or len(mask.index) != len(set(mask.index)):
+            raise ValueError("target, weight and mask must not have duplicate index")
+        
+        # Check if rci_model is None or IConstantRCI
+        if rci_model is None:
+            self._rci_model = ExponentialRCIModel()
+        elif isinstance(rci_model, IConstantRCI):
+            self._rci_model = rci_model
+        else:
+            raise ValueError("rci_model must follow IConstantRCI protocol")
+
+        self._target = target.copy(deep=True)
+        self._weight = weight.copy(deep=True)
+        self._mask = mask.copy(deep=True)
+
+    def get_evaluation_func(self) -> Callable[[npt.NDArray], np.float64]:
+        scales = self._target.index.to_numpy()
+        stats_len = len(Stat_Props)
+
+        target_np = self._target.to_numpy()
+        weight_np = self._weight.to_numpy()
+        mask_np = self._mask.to_numpy().astype(np.bool_)
+
+        f1_func = self._rci_model.get_f1
+        f2_func = self._rci_model.get_f2
+
+        @nb.njit
+        def evaluation_func(x: npt.NDArray[np.float64]) -> np.float64:
+            predict = np.zeros((len(scales), stats_len), dtype=np.float64)
+            lambda_, phi, kappa, alpha, nu, sigmax_mux, iota = x
+            f1 = f1_func(sigmax_mux)
+            f2 = f2_func(sigmax_mux)
+            for t, scale in enumerate(scales):
+                mean = None
+                variance = None
+                moment_3rd = None
+                for stat in range(stats_len):
+                    if not mask_np[t, stat]:
+                        continue
+                    if stat == 0:   # Stat_Props.MEAN.value
+                        if mean is None:
+                            mean = _blrprx_mean(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota)
+                        predict[t, stat] = mean
+                    elif stat == 1:   # Stat_Props.CVAR.value
+                        if mean is None:
+                            mean = _blrprx_mean(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota)
+                        if variance is None:
+                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
+                        predict[t, stat] = np.sqrt(variance) / mean 
+                    elif stat == 2:   # Stat_Props.SKEWNESS.value
+                        if moment_3rd is None:
+                            moment_3rd = _blrprx_moment_3rd(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, f2) 
+                        if variance is None:
+                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
+                        predict[t, stat] = moment_3rd / np.power(variance, 1.5)
+                    elif stat == 3:   # Stat_Props.AR1.value
+                        if variance is None:
+                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
+                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 1.0) / variance
+                    elif stat == 4:   # Stat_Props.AR2.value
+                        if variance is None:
+                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
+                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 2.0) / variance
+                    elif stat == 5:   # Stat_Props.AR3.value
+                        if variance is None:
+                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
+                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 3.0) / variance
+                    elif stat == 6:   # Stat_Props.pDRY.value
+                        predict[t, stat] = 0
+                    elif stat == 7:   # Stat_Props.MSIT.value
+                        predict[t, stat] = 0
+                    elif stat == 8:   # Stat_Props.MSD.value
+                        predict[t, stat] = 0
+                    elif stat == 9:   # Stat_Props.MCIT.value
+                        predict[t, stat] = 0
+                    elif stat == 10:   # Stat_Props.MCD.value
+                        predict[t, stat] = 0
+                    elif stat == 11:   # Stat_Props.MCS.value
+                        predict[t, stat] = 0
+                    elif stat == 12:   # Stat_Props.MPC.value
+                        predict[t, stat] = 0
+                    elif stat == 13:   # Stat_Props.VAR.value
+                        if variance is None:
+                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
+                        predict[t, stat] = variance
+                    elif stat == 14:   # Stat_Props.AC1.value
+                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 1.0)
+                    elif stat == 15:   # Stat_Props.AC2.value
+                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 2.0)
+                    elif stat == 16:   # Stat_Props.AC3.value
+                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 3.0)
+            
+            print(predict)
+            return np.nansum(np.power(predict - target_np, 2) * weight_np * mask_np)
+        return evaluation_func
+
+    @staticmethod
+    def default_target(scale_list: List[float] = [1]):
         # Create a pandas dataframe with Stat_Props as columns one row with timescales=1,3,6,24
-        template = pd.DataFrame(columns=[prop.name for prop in Stat_Props], index=[1,3,6,24], dtype=np.float64)
-        return template
+        target_df = pd.DataFrame(columns=[prop for prop in Stat_Props], index = scale_list, dtype=np.float64)
+        target_df.index.name = "timescales"
+        return target_df
+
+    @staticmethod
+    def default_weight(scale_list: List[float] = [1]):
+        # Create a pandas dataframe with Stat_Props as columns one row with timescales=1,3,6,24
+        weight_df = pd.DataFrame(columns=[prop for prop in Stat_Props], index = scale_list, dtype=np.float64)
+        weight_df.index.name = "timescales"
+        return weight_df
+    
+    @staticmethod
+    def default_mask(scale_list: List[float] = [1]):
+        # Create a numpy array with Stat_Props as columns one row with timescales=1,3,6,24, with default value of False
+        mask_np = np.zeros((len(scale_list), len(Stat_Props)), dtype=np.int_)
+        # Create a pandas dataframe with Stat_Props as columns one row with timescales=1,3,6,24, with default value of False
+        mask_df = pd.DataFrame(data=mask_np, columns=[prop for prop in Stat_Props], index = scale_list, dtype=np.int_)
+        mask_df.index.name = "timescales"
+        return mask_df
+    
