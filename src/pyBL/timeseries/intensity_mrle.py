@@ -360,6 +360,9 @@ def _mrle_acf(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64],
         sse = 0
         for i in range(n-1):
             sse += (intensity[i] - mean)**2 * (time[i+1] - time[i])
+    
+    if sse == 0:
+        return np.nan
 
     shift = 0
     for time_idx in time:
@@ -391,6 +394,9 @@ def _mrle_cvar(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
             sum += intensity[i] * (time[i+1] - time[i])
         mean = sum / (time[-1] - time[0]) #Mean
 
+    if mean == 0:
+        return np.nan
+
     if sse is None:
         sse = 0
         for i in range(len(time)-1):
@@ -413,6 +419,9 @@ def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
         sse = 0
         for i in range(len(time)-1):
             sse += (intensity[i] - mean)**2 * (time[i+1] - time[i])
+
+    if sse == 0:
+        return np.nan
 
     # Standard deviation
     # TODO: Check how to do unbiased standard deviation on MRLE when time is float

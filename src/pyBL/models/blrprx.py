@@ -322,7 +322,7 @@ def _blrprx_covariance(
     sigmax_mux: float,
     iota: float,
     f1: float,
-    k: float,
+    lag: float,
 ):
     mu_c = 1.0 + kappa / phi
 
@@ -332,15 +332,15 @@ def _blrprx_covariance(
     # Because in Kaczmarska et al. (2014) (1) There is also a k. That is not lag right?
 
     cov_part1 = (f1 + (kappa * phi) / (phi**2 - 1)) * (
-        _blrprx_kernel(1.0, (k - 1.0) * timescale, nu, alpha)
-        - 2 * _blrprx_kernel(1.0, k * timescale, nu, alpha)
-        + _blrprx_kernel(1.0, (k + 1.0) * timescale, nu, alpha)
+        _blrprx_kernel(1.0, (lag - 1.0) * timescale, nu, alpha)
+        - 2 * _blrprx_kernel(1.0, lag * timescale, nu, alpha)
+        + _blrprx_kernel(1.0, (lag + 1.0) * timescale, nu, alpha)
     )
 
     cov_part2 = (kappa / (phi**4 - phi**2)) * (
-        _blrprx_kernel(1.0, phi * (k - 1.0) * timescale, nu, alpha)
-        - 2 * _blrprx_kernel(1.0, phi * k * timescale, nu, alpha)
-        + _blrprx_kernel(1.0, phi * (k + 1.0) * timescale, nu, alpha)
+        _blrprx_kernel(1.0, phi * (lag - 1.0) * timescale, nu, alpha)
+        - 2 * _blrprx_kernel(1.0, phi * lag * timescale, nu, alpha)
+        + _blrprx_kernel(1.0, phi * (lag + 1.0) * timescale, nu, alpha)
     )
     return lambda_ * mu_c * iota**2 * (cov_part1 - cov_part2)
 

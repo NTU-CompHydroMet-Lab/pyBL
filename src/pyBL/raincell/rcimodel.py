@@ -4,6 +4,7 @@ from typing import Optional, Protocol, Union, overload, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
+import numba as nb  # type: ignore
 import scipy as sp  # type: ignore
 
 
@@ -26,10 +27,12 @@ class IConstantRCI(Protocol):
 
 class GammaRCIModel(IConstantRCI):
     @staticmethod
+    @nb.njit
     def get_f1(sigmax_mux: float) -> float:
         return (sigmax_mux + 1.0) / sigmax_mux
 
     @staticmethod
+    @nb.njit
     def get_f2(sigmax_mux: float) -> float:
         x2 = sigmax_mux**2
         return (x2 + 3.0 * sigmax_mux + 2.0) / x2
@@ -45,10 +48,12 @@ class GammaRCIModel(IConstantRCI):
 
 class ExponentialRCIModel(IConstantRCI):
     @staticmethod
+    @nb.njit
     def get_f1(sigmax_mux: float) -> float:
         return 2.0
 
     @staticmethod
+    @nb.njit
     def get_f2(sigmax_mux: float) -> float:
         return 6.0
 
@@ -66,12 +71,14 @@ class ExponentialRCIModel(IConstantRCI):
 
 class WeibullRCIModel(IConstantRCI):
     @staticmethod
+    @nb.njit
     def get_f1(sigmax_mux: float) -> float:
         ex2: float = sp.special.gamma(1.0 + 2.0 / sigmax_mux)
         ex: float = sp.special.gamma(1.0 + 1.0 / sigmax_mux)
         return ex2 / ex**2
 
     @staticmethod
+    @nb.njit
     def get_f2(sigmax_mux: float) -> float:
         ex3: float = sp.special.gamma(1.0 + 3.0 / sigmax_mux)
         ex: float = sp.special.gamma(1.0 + 1.0 / sigmax_mux)
@@ -92,10 +99,12 @@ class WeibullRCIModel(IConstantRCI):
 
 class ParetoRCIModel(IConstantRCI):
     @staticmethod
+    @nb.njit
     def get_f1(sigmax_mux: float) -> float:
         return (sigmax_mux - 1.0) ** 2 / sigmax_mux / (sigmax_mux - 2.0)
 
     @staticmethod
+    @nb.njit
     def get_f2(sigmax_mux: float) -> float:
         return (sigmax_mux - 1.0) ** 3 / sigmax_mux**2 / (sigmax_mux - 3.0)
 
@@ -114,10 +123,12 @@ class ParetoRCIModel(IConstantRCI):
 
 class GPRCIModel(IConstantRCI):
     @staticmethod
+    @nb.njit
     def get_f1(sigmax_mux: float) -> float:
         return 2.0 * (1.0 - sigmax_mux) / (1.0 * 2.0 * sigmax_mux)
 
     @staticmethod
+    @nb.njit
     def get_f2(sigmax_mux: float) -> float:
         return (
             6.0
