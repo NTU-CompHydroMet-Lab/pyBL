@@ -271,7 +271,6 @@ class BLRPRxFitter:
             for prop in enabled_props:
                 if self._mask[i, prop.value]:
                     result[i, prop.value] = model.get_prop(prop, ts)
-        print(result)
         diff = np.sum(np.power(result - target, 2) * weight)
         return diff
 
@@ -330,7 +329,7 @@ class BLRPRxConfig:
 
         f1_func = self._rci_model.get_f1
         f2_func = self._rci_model.get_f2
-
+        
         @nb.njit
         def evaluation_func(x: npt.NDArray[np.float64]) -> np.float64:
             predict = np.zeros((len(scales), stats_len), dtype=np.float64)
@@ -338,66 +337,45 @@ class BLRPRxConfig:
             f1 = f1_func(sigmax_mux)
             f2 = f2_func(sigmax_mux)
             for t, scale in enumerate(scales):
-                mean = None
-                variance = None
-                moment_3rd = None
-                for stat in range(stats_len):
-                    if not mask_np[t, stat]:
-                        continue
-                    if stat == 0:   # Stat_Props.MEAN.value
-                        if mean is None:
-                            mean = _blrprx_mean(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota)
-                        predict[t, stat] = mean
-                    elif stat == 1:   # Stat_Props.CVAR.value
-                        if mean is None:
-                            mean = _blrprx_mean(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota)
-                        if variance is None:
-                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
-                        predict[t, stat] = np.sqrt(variance) / mean 
-                    elif stat == 2:   # Stat_Props.SKEWNESS.value
-                        if moment_3rd is None:
-                            moment_3rd = _blrprx_moment_3rd(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, f2) 
-                        if variance is None:
-                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
-                        predict[t, stat] = moment_3rd / np.power(variance, 1.5)
-                    elif stat == 3:   # Stat_Props.AR1.value
-                        if variance is None:
-                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
-                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 1.0) / variance
-                    elif stat == 4:   # Stat_Props.AR2.value
-                        if variance is None:
-                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
-                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 2.0) / variance
-                    elif stat == 5:   # Stat_Props.AR3.value
-                        if variance is None:
-                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
-                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 3.0) / variance
-                    elif stat == 6:   # Stat_Props.pDRY.value
-                        predict[t, stat] = 0
-                    elif stat == 7:   # Stat_Props.MSIT.value
-                        predict[t, stat] = 0
-                    elif stat == 8:   # Stat_Props.MSD.value
-                        predict[t, stat] = 0
-                    elif stat == 9:   # Stat_Props.MCIT.value
-                        predict[t, stat] = 0
-                    elif stat == 10:   # Stat_Props.MCD.value
-                        predict[t, stat] = 0
-                    elif stat == 11:   # Stat_Props.MCS.value
-                        predict[t, stat] = 0
-                    elif stat == 12:   # Stat_Props.MPC.value
-                        predict[t, stat] = 0
-                    elif stat == 13:   # Stat_Props.VAR.value
-                        if variance is None:
-                            variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
-                        predict[t, stat] = variance
-                    elif stat == 14:   # Stat_Props.AC1.value
-                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 1.0)
-                    elif stat == 15:   # Stat_Props.AC2.value
-                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 2.0)
-                    elif stat == 16:   # Stat_Props.AC3.value
-                        predict[t, stat] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 3.0)
-            
-            print(predict)
+                mean = _blrprx_mean(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota)
+                variance = _blrprx_variance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1)
+                moment_3rd = _blrprx_moment_3rd(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, f2)
+                #if not mask_np[t, stat]:
+                    #continue
+                if mask_np[t, 0]:     # Stat_Props.MEAN.value
+                    predict[t, 0] = mean
+                if mask_np[t,1]:   # Stat_Props.CVAR.value
+                    predict[t, 1] = np.sqrt(variance) / mean 
+                if mask_np[t,2]:   # Stat_Props.SKEWNESS.value
+                    predict[t, 2] = moment_3rd / np.power(variance, 1.5)
+                if mask_np[t,3]:   # Stat_Props.AR1.value
+                    predict[t, 3] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 1.0) / variance
+                if mask_np[t,4]:   # Stat_Props.AR2.value
+                    predict[t, 4] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 2.0) / variance
+                if mask_np[t,5]:   # Stat_Props.AR3.value
+                    predict[t, 5] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 3.0) / variance
+                if mask_np[t,6]:   # Stat_Props.pDRY.value
+                    predict[t, 6] = 0
+                if mask_np[t,7]:   # Stat_Props.MSIT.value
+                    predict[t, 7] = 0
+                if mask_np[t,8]:   # Stat_Props.MSD.value
+                    predict[t, 8] = 0
+                if mask_np[t,9]:   # Stat_Props.MCIT.value
+                    predict[t, 9] = 0
+                if mask_np[t,10]:   # Stat_Props.MCD.value
+                    predict[t, 10] = 0
+                if mask_np[t,11]:   # Stat_Props.MCS.value
+                    predict[t, 11] = 0
+                if mask_np[t,12]:   # Stat_Props.MPC.value
+                    predict[t, 12] = 0
+                if mask_np[t,13]:   # Stat_Props.VAR.value
+                    predict[t, 13] = variance
+                if mask_np[t,14]:   # Stat_Props.AC1.value
+                    predict[t, 14] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 1.0)
+                if mask_np[t,15]:   # Stat_Props.AC2.value
+                    predict[t, 15] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 2.0)
+                if mask_np[t,16]:   # Stat_Props.AC3.value
+                    predict[t, 16] = _blrprx_covariance(scale, lambda_, phi, kappa, alpha, nu, sigmax_mux, iota, f1, 3.0)
             return np.nansum(np.power(predict - target_np, 2) * weight_np * mask_np)
         return evaluation_func
 

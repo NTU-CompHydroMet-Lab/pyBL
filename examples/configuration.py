@@ -74,8 +74,8 @@ for month in range(12):
         stats_month[month, scale, :] = [
             model.mean(),
             model.cvar(),
-            model.acf(),
             model.skewness(),
+            model.acf(),
             model.pDry(0),
         ]
 
@@ -89,8 +89,8 @@ for month in range(12):
             stats_month_seperate[month, year, scale, :] = [
                 model.mean(),
                 model.cvar(),
-                model.acf(),
                 model.skewness(),
+                model.acf(),
                 model.pDry(0),
             ]
 
@@ -104,14 +104,14 @@ weight_np = stats_weight[0, 1:, :]
 target = BLRPRxConfig.default_target([1, 3, 6, 24])
 target[Stat_Props.MEAN] = target_np[:, 0]
 target[Stat_Props.CVAR] = target_np[:, 1]
-target[Stat_Props.AR1] = target_np[:, 2]
-target[Stat_Props.SKEWNESS] = target_np[:, 3]
+target[Stat_Props.SKEWNESS] = target_np[:, 2]
+target[Stat_Props.AR1] = target_np[:, 3]
 
 weight = BLRPRxConfig.default_weight([1, 3, 6, 24])
 weight[Stat_Props.MEAN] = weight_np[:, 0]
 weight[Stat_Props.CVAR] = weight_np[:, 1]
-weight[Stat_Props.AR1] = weight_np[:, 2]
-weight[Stat_Props.SKEWNESS] = weight_np[:, 3]
+weight[Stat_Props.SKEWNESS] = weight_np[:, 2]
+weight[Stat_Props.AR1] = weight_np[:, 3]
 
 mask = BLRPRxConfig.default_mask([1, 3, 6, 24])
 mask[Stat_Props.MEAN] = [1, 0, 0, 0]
@@ -120,14 +120,15 @@ mask[Stat_Props.AR1] = [1, 1, 1, 1]
 mask[Stat_Props.SKEWNESS] = [1, 1, 1, 1]
 
 config = BLRPRxConfig(target=target, weight=weight, mask=mask)
-a = config.get_evaluation_func()
-arr = np.array([0.016679733103341976, 0.08270236178820184, 0.34970877070925505, 9.017352714561754, 0.9931496975448589, 1.01, 0.971862948182735])
+obj_func = config.get_evaluation_func()
+arr = np.array([0.016679733103341976, 0.08270236178820184, 0.34970877070925505, 9.017352714561754, 0.9931496975448589, 1.0, 0.971862948182735])
+params = BLRPRx_params(*arr)
 
 old_config = BLRPRxFitter()
 model = BLRPRx()
 
-print(a(arr))
-print(old_config._evaluate(arr, target_np, weight_np, model))
+print(obj_func(arr))
+print(old_config.evaluate(params, target_np, weight_np, model))
 
-#print(timeit.timeit(lambda: a(arr), number=389253))
-#print(timeit.timeit(lambda: old_config._evaluate(arr, target_np, weight_np, model), number=389253))
+print(timeit.timeit(lambda: obj_func(arr), number=100000))
+print(timeit.timeit(lambda: old_config._evaluate(arr, target_np, weight_np, model), number=100000))

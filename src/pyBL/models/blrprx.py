@@ -245,6 +245,10 @@ class BLRPRx(BaseBLRP):
 
 @nb.njit
 def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
+    '''
+    k: lag
+    u: timescale
+    '''
     # Modelling rainfall with a Bartlett–Lewis process: new developments(2020) Formula (5)
 
     ## TODO: Check if this is still required.
@@ -360,14 +364,7 @@ def _blrprx_moment_3rd(
 ):
     mu_c = 1.0 + kappa / phi
 
-    phi2 = phi**2
-    phi3 = phi**3
-    phi4 = phi**4
-    phi5 = phi**5
-    phi6 = phi**6
-    phi7 = phi**7
-    phi8 = phi**8
-    phi9 = phi**9
+    phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9 = np.power(phi, np.arange(2, 10))
 
     kappa2 = kappa**2
 
