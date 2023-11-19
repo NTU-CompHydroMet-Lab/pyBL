@@ -10,7 +10,7 @@ from typing import (
 
 import numpy as np
 import numpy.typing as npt
-import numba as nb
+import numba as nb  # type: ignore
 
 __all__ = ["IntensityMRLE"]
 
@@ -96,7 +96,7 @@ class IntensityMRLE:
     def intensity_delta(self) -> npt.NDArray[np.float64]:
         return self._intensity_delta
 
-    def add(self, timeseries: IntensityMRLE, sequential=False) -> None:
+    def add(self, timeseries: IntensityMRLE, sequential: bool=False) -> None:
         if len(timeseries.time) == 0:
             return
         if sequential is True:
@@ -162,50 +162,114 @@ class IntensityMRLE:
         # Use binary search to find the index
         idx = np.searchsorted(a=self._time, v=time_idx, side="right")
         if idx == 0 or idx == len(self._time):
-            return np.float64(0)
-        return self._intensity[idx - 1]
+            return np.float64(0.0)
+        return self._intensity[int(idx) - 1]
 
     def __str__(self) -> str:
         time_value = "\n".join(f'{self.time[i]:>5.7f} {self.intensity[i]:>5.7f}' for i in range(len(self.time)))
         return time_value
     
     def total(self) -> float:
+        '''
+        Calculate the total depth of the intensity timeseries.
+        '''
         if self._time.size == 0:
             return 0
         return _mrle_total(self._time, self._intensity)
 
-    def mean(self) -> float:
+    def mean(self) -> Union[float]:
+        '''
+        Calculate the mean of the intensity timeseries.
+        '''
         if self._time.size == 0:
             return np.nan
         return _mrle_mean(self._time, self._intensity)
 
     def acf(self, lag=1) -> float:
+        '''
+        Calculate the n-lag autocorrelation coefficient of the intensity timeseries.
+        It's basically Cov(X_t, X_{t+lag}) / Var(X_t)
+
+        Parameters
+        ----------
+        lag : int, optional
+            The lag of the autocorrelation coefficient, by default 1
+        
+        Returns
+        -------
+        n-lag Autocorrelation coefficient: float
+        '''
         if self._time.size == 0:
             return np.nan
         return _mrle_acf(self._time, self._intensity, lag=lag)
 
-    def cvar(self, ddof=1) -> float:
+    def cvar(self, biased=False) -> float:
+        '''
+        Calculate the coefficient of variation of the intensity timeseries.
+
+        Parameters
+        ----------
+        biased : bool, optional
+            Whether to use the biased estimator of the standard deviation, by default False.
+
+        Returns
+        -------
+        coefficient of variation: float
+        '''
         if self._time.size == 0:
             return np.nan
-        return _mrle_cvar(self._time, self._intensity, ddof=ddof)
+        return _mrle_coef_var(self._time, self._intensity, biased=biased)
 
     def skewness(self, biased_sd=True) -> float:
+        '''
+        Calculate the skewness of the intensity timeseries.
+        The standard deviation is calculated with the biased estimator.
+        
+        Parameters
+        ----------
+        biased_sd : bool, optional
+            Whether to use the biased estimator of the skewness, by default True.
+        
+        Returns
+        -------
+        skewness : float
+        '''
         if self._time.size == 0:
             return np.nan
-        return _mrle_skew(self._time, self._intensity, biased_sd=biased_sd)
+        return _mrle_skew(self._time, self._intensity, biased=biased_sd)
 
     def pDry(self, threshold: float=0) -> float:
+        '''
+        Calculate the probability of dryness of the intensity timeseries with a threshold.
+
+        Parameters
+        ----------
+        threshold : float, optional
+            The threshold of dryness, by default 0
+        
+        Returns
+        -------
+        probability of dryness : float
+        '''
         if self._time.size == 0:
             return np.nan
         return _mrle_pDry(self._time, self._intensity, threshold=threshold)
 
     def rescale(self, scale: float) -> IntensityMRLE:
+        '''
+        Rescale the MRLE timeseries to a different scale.
+        New time index will be divided by the scale. And the intensity will be multiplied by the scale.
+        All the time index will be divisible by the scale.
+        '''
         if self._time.size == 0:
             return type(self)(scale=self._scale * scale)
         scale_time, scale_intensity = _mrle_rescale(self._time, self._intensity, scale)
         return type(self)(scale_time, scale_intensity, self._scale * scale)
 
     def unpack(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        '''
+        Unpack the MRLE timeseries into a normal timeseries.
+        '''
         if self._time.size == 0:
             return np.array([], dtype=np.float64), np.array([], dtype=np.float64)
         else:
@@ -312,6 +376,21 @@ def _delta_to_mrle(
     )
 
 def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
+    '''
+    Merge two MRLE timeseries together.
+
+    Parameters
+    ----------
+    a : IntensityMRLE
+        The first IntensityMRLE timeseries.
+    b : IntensityMRLE
+        The second IntensityMRLE timeseries.
+    
+    Returns
+    -------
+    IntensityMRLE
+        The merged IntensityMRLE timeseries.
+    '''
     if a._scale != b._scale:
         raise ValueError("Merging two timeseries with different scale is not supported '''YET'''.")
     if len(a.intensity_delta) == 0 and len(b.intensity_delta) == 0:
@@ -337,29 +416,288 @@ def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
 
 @nb.njit
 def _mrle_total(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
-    each_intensity_duration = np.diff(time)
-    return np.sum(intensity[:-1] * each_intensity_duration)
+    '''
+    ### This is an internal function. Use `IntensityMRLE.mean()` instead.
+
+    Calculate the total depth of the intensity timeseries.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+
+    Returns
+    -------
+    mean: float
+        The total depth of the intensity timeseries. 
+        
+    '''
+    #each_intensity_duration = np.diff(time)
+    total = 0
+    for i in range(len(time)-1):
+        total += intensity[i] * (time[i+1] - time[i])
+    return total
+
+@nb.njit    
+def _mrle_mean(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
+    '''
+    ### This is an internal function. Use `IntensityMRLE.mean()` instead.
+
+    Calculate the mean of the intensity timeseries.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+
+    Returns
+    -------
+    mean: float
+        The mean of the intensity timeseries.
+        
+    '''
+    return _mrle_total(time, intensity) / (time[-1] - time[0])
+
 
 @nb.njit
-def _mrle_mean(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]) -> float:
-    return _mrle_total(time, intensity) / (time[-1] - time[0])
+def _mrle_sum_squared_error(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None) -> float:
+    '''
+    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+
+    Calculate the sum of squared error of the intensity timeseries.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+    mean : float, optional
+        The mean of the intensity timeseries, If None, it will be calculated, by default None
+
+    Returns
+    -------
+    sum of squared error: float
+        The sum of squared error of the intensity timeseries.
+    '''
+    if mean is None:
+        mean = _mrle_mean(time, intensity)
+    sse = 0
+    for i in range(len(time)-1):
+        sse += (intensity[i] - mean)**2 * (time[i+1] - time[i])
+    return sse
+
+@nb.njit
+def _mrle_variance(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, biased=False) -> float:
+    '''
+    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+
+    Calculate the variance of the intensity timeseries.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+    mean : float, optional
+        The mean of the intensity timeseries, If None, it will be calculated, by default None
+    sse : float, optional
+        The sum of squared error of the intensity timeseries, If None, it will be calculated, by default None
+    biased : bool, optional
+        Whether to use the biased estimator of the variance, by default False.
+        
+    Returns
+    -------
+    variance: float
+        The variance of the intensity timeseries.
+    '''
+    if mean is None:
+        mean = _mrle_mean(time, intensity)
+    if sse is None:
+        sse = _mrle_sum_squared_error(time, intensity, mean)
+    return sse / (time[-1] - time[0] - (biased is False))
+
+@nb.njit
+def _mrle_standard_deviation(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, biased = False) -> float:
+    '''
+    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+
+    Calculate the standard deviation of the intensity timeseries.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+    mean : float, optional
+        The mean of the intensity timeseries, If None, it will be calculated, by default None
+    sse : float, optional
+        The sum of squared error of the intensity timeseries, If None, it will be calculated, by default None
+    biased : bool, optional
+        Whether to use the biased estimator of the standard deviation, by default False.
+
+    Returns
+    -------
+    standard deviation: float
+        The standard deviation of the intensity timeseries.
+    '''
+    if mean is None:
+        mean = _mrle_mean(time, intensity)
+    if sse is None:
+        sse = _mrle_sum_squared_error(time, intensity, mean)
+    return (_mrle_variance(time, intensity, mean, sse, biased))**0.5
+
+@nb.njit
+def _mrle_coef_var(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, biased = False) -> float:
+    '''
+    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+
+    Calculate the coefficient of variation of the intensity timeseries.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+    mean : float, optional 
+        The mean of the intensity timeseries, If None, it will be calculated, by default None
+    sse : float, optional
+        The sum of squared error of the intensity timeseries, If None, it will be calculated, by default None
+    biased : bool, optional
+        Whether to use the biased estimator of the standard deviation, by default False.
+
+    Returns
+    -------
+    coefficient of variation: float
+        The coefficient of variation of the intensity timeseries.
+
+    '''
+    # Coefficient of variation
+    if mean is None:
+        mean = _mrle_mean(time, intensity)
+
+    if mean == 0:
+        return np.nan
+
+    if sse is None:
+        sse = _mrle_sum_squared_error(time, intensity, mean)
+
+    return _mrle_standard_deviation(time, intensity, mean=mean, sse=sse, biased=biased) / mean
+
+@nb.njit
+def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sd = None, biased = False) -> float:
+    '''
+    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+
+    Calculate the skewness of the intensity timeseries.
+    The standard deviation is calculated with the unbiased estimator.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+    mean : float, optional
+        The mean of the intensity timeseries, If None, it will be calculated, by default None
+    sd : float, optional
+        The standard deviation of the intensity timeseries, If None, it will be calculated, by default None
+    biased : bool, optional
+        Whether to use the biased estimator of the skewness, by default False.
+        If False, the unbiased estimator will be used. Which is (n*(n-1))**0.5 / (n-2) * biased_skewness
+    
+    Returns
+    -------
+    skewness : float
+        The skewness of the intensity timeseries.
+    '''
+    # Skewness
+    n = time[-1] - time[0]
+    if mean is None:
+        mean = _mrle_mean(time, intensity)
+
+    if sd is None:
+        sd = _mrle_standard_deviation(time, intensity, mean, biased=False)
+
+    # Skewness
+    skewness = 0
+    for i in range(len(time)-1):
+        skewness += (intensity[i] - mean)**3 * (time[i+1] - time[i])
+    skewness = skewness/(((time[-1] - time[0]))*sd**3)
+
+    if biased is False:
+        skewness *= (n*(n-1))**0.5 / (n-2)
+    return skewness
+
+def _mrle_pDry(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], threshold: float=0) -> float:
+    '''
+    ### This is an internal function. Use `IntensityMRLE.pDry()` instead.
+
+    Calculate the probability of dryness of the intensity timeseries with a threshold.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+    threshold : float, optional
+        The threshold of dryness, by default 0
+
+    Returns
+    -------
+    probability of dryness : float
+    '''
+    wet_time = 0
+    for i in range(len(time)-1):
+        if intensity[i] > threshold:
+            wet_time += time[i+1] - time[i]
+
+    return 1 - (wet_time / (time[-1] - time[0]))
+
 
 @nb.njit
 def _mrle_acf(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], lag=1, mean = None, sse = None):
+    '''
+    ### This is an internal function. Use `IntensityMRLE.acf()` instead.
+
+    Calculate the n-lag autocorrelation coefficient of the intensity timeseries.  
+    It's basically Cov(X_t, X_{t+lag}) / Var(X_t)  
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+    lag : int, optional
+        The lag of the autocorrelation coefficient, by default 1
+    mean : float, optional
+        The mean of the intensity timeseries, If None, it will be calculated, by default None
+    sse : float, optional
+        The sum of squared error of the intensity timeseries, If None, it will be calculated, by default None
+
+    Returns
+    -------
+    n-lag Autocorrelation coefficient: float
+        The n-lag autocorrelation coefficient of the intensity timeseries.
+    '''
     if lag == 0:
         return 1
     n = len(time)
 
     if mean is None:
-        sum = 0
-        for i in range(n-1):
-            sum += intensity[i] * (time[i+1] - time[i])
-        mean = sum / (time[-1] - time[0]) #Mean
+        mean = _mrle_mean(time, intensity)
 
     if sse is None:
-        sse = 0
-        for i in range(n-1):
-            sse += (intensity[i] - mean)**2 * (time[i+1] - time[i])
+        sse = _mrle_sum_squared_error(time, intensity, mean)
     
     if sse == 0:
         return np.nan
@@ -385,67 +723,41 @@ def _mrle_acf(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64],
             y_idx += 1
     return result / sse
 
-@nb.njit
-def _mrle_cvar(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, ddof = 0) -> float:
-    # Coefficient of variation
-    if mean is None:
-        sum = 0
-        for i in range(len(time)-1):
-            sum += intensity[i] * (time[i+1] - time[i])
-        mean = sum / (time[-1] - time[0]) #Mean
-
-    if mean == 0:
-        return np.nan
-
-    if sse is None:
-        sse = 0
-        for i in range(len(time)-1):
-            sse += (intensity[i] - mean)**2 * (time[i+1] - time[i])
-
-    return (sse / (time[-1] - time[0] - ddof))**0.5 / mean
-
-@nb.njit
-def _mrle_skew(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], mean = None, sse = None, biased_sd = False) -> float:
-    # Skewness
-    n = time[-1] - time[0]
-    if mean is None:
-        sum = 0
-        for i in range(len(time)-1):
-            sum += intensity[i] * (time[i+1] - time[i])
-        mean = sum / n
-
-    # Sum of squared error
-    if sse is None:
-        sse = 0
-        for i in range(len(time)-1):
-            sse += (intensity[i] - mean)**2 * (time[i+1] - time[i])
-
-    if sse == 0:
-        return np.nan
-
-    # Standard deviation
-    # TODO: Check how to do unbiased standard deviation on MRLE when time is float
-    sd = (sse / (n - (biased_sd is False)))**0.5
-
-    # Skewness
-    skewness = 0
-    for i in range(len(time)-1):
-        skewness += (intensity[i] - mean)**3 * (time[i+1] - time[i])
-    skewness = skewness/(((time[-1] - time[0]))*sd**3)
-    return skewness
-
-def _mrle_pDry(time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], threshold: float=0) -> float:
-    wet_time = 0
-    for i in range(len(time)-1):
-        if intensity[i] > threshold:
-            wet_time += time[i+1] - time[i]
-
-    return 1 - (wet_time / (time[-1] - time[0]))
-
-@nb.njit
+@nb.njit()
 def _mrle_rescale(
     time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], scale: float
-):
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    '''
+    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+
+    Rescale the MRLE timeseries to a different scale.
+    New time index will be divided by the scale. And the intensity will be multiplied by the scale.
+    All the time index will be divisible by the scale.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+    scale : float
+        The scale to be rescaled to.
+    
+    Returns
+    -------
+    scaled time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format.
+    scaled intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format.
+            
+    Examples
+    --------
+    >>> time = np.array([0, 10, 13, 18, 33])
+    >>> intensity = np.array([0, 3, 0, 5, np.nan])
+    >>> scale = 5
+    >>> _mrle_rescale(time, intensity, scale)
+    (array([0., 2., 3., 4., 6., 7.]), array([ 0.,  9., 10., 25., 15., nan]))
+    '''
     time_index = len(time) - 1
     scale_time = np.zeros(time_index*3+2)
     scale_intensity = np.zeros(time_index*3+2)
