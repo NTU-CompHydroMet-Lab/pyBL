@@ -10,7 +10,7 @@ import math
 
 from pyBL.models import BaseBLRP, BaseBLRP_RCIModel, Stat_Props
 from pyBL.timeseries import IntensityMRLE
-import numba as nb
+import numba as nb # type: ignore
 
 
 @dataclass
@@ -59,10 +59,10 @@ class BLRPRx(BaseBLRP):
     def __init__(
         self,
         params: Optional[BLRPRx_params] = None,
-        rng: Optional[np.random.Generator] = None,
+        sampling_rng: Optional[np.random.Generator] = None,
         rci_model: BaseBLRP_RCIModel = None,
     ) -> None:
-        super().__init__(rng, rci_model)
+        super().__init__(sampling_rng, rci_model)
         # If user does not provide params, give the default values.
         if params is None:
             self.params = BLRPRx_params(
@@ -88,7 +88,7 @@ class BLRPRx(BaseBLRP):
 
         return BLRPRx(
             params=self.get_params(),
-            rng=rng,
+            sampling_rng=rng,
             rci_model=type(self.rci_model)(),
         )
 
@@ -243,8 +243,12 @@ class BLRPRx(BaseBLRP):
         return IntensityMRLE.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
+    '''
+    k: lag
+    u: timescale
+    '''
     # Modelling rainfall with a Bartlett–Lewis process: new developments(2020) Formula (5)
 
     ## TODO: Check if this is still required.
@@ -263,7 +267,7 @@ def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
     )
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_mean(
     timescale: float,
     lambda_: float,
@@ -279,7 +283,7 @@ def _blrprx_mean(
     return timescale * lambda_ * iota * mu_c * _blrprx_kernel(0, 0, nu, alpha)
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_variance(
     timescale: float,
     lambda_: float,
@@ -311,7 +315,7 @@ def _blrprx_variance(
     )
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_covariance(
     timescale: float,
     lambda_: float,
@@ -345,7 +349,7 @@ def _blrprx_covariance(
     return lambda_ * mu_c * iota**2 * (cov_part1 - cov_part2)
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_moment_3rd(
     timescale: float,
     lambda_: float,
@@ -360,14 +364,7 @@ def _blrprx_moment_3rd(
 ):
     mu_c = 1.0 + kappa / phi
 
-    phi2 = phi**2
-    phi3 = phi**3
-    phi4 = phi**4
-    phi5 = phi**5
-    phi6 = phi**6
-    phi7 = phi**7
-    phi8 = phi**8
-    phi9 = phi**9
+    phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9 = np.power(phi, np.arange(2, 10))
 
     kappa2 = kappa**2
 
