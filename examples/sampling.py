@@ -55,6 +55,8 @@ for exp in range(sample_size):
 
 ## Plot the results
 for i, scale in enumerate([1, 3, 6, 24]):
+    # Set the font size
+    plt.rcParams.update({"font.size": 8})
     # Plot bin chart for mean, cvar, ar1, skewness
     fig, axs = plt.subplots(2, 2)
     fig.suptitle(

@@ -495,7 +495,7 @@ def _blrprx_sample(
     # Storm number sampling
     n_storm = rng.poisson(lambda_ * duration_hr)
 
-    total_cell: int = 0
+    total_cells: int = 0
     eta = np.empty(n_storm, dtype=np.float64)
     mux = np.empty(n_storm, dtype=np.float64)
     storm_starts = np.empty(n_storm, dtype=np.float64)
@@ -509,9 +509,8 @@ def _blrprx_sample(
         storm_starts[i] = rng.uniform(0, duration_hr) # storm_starts = rng.uniform(0, duration_hr, n_storm)
         storm_durations[i] = rng.exponential(1 / gamma) # storm_durations = rng.exponential(1 / gamma, n_storm)
         n_cells_per_storm[i] = 1 + rng.poisson(beta * storm_durations[i]) # n_cells_per_storm = 1 + rng.poisson(beta * storm_durations, size=n_storm)
-        total_cell += n_cells_per_storm[i]
+        total_cells += n_cells_per_storm[i]
     
-    total_cells: int = n_cells_per_storm.sum()
 
     # Pre-allocate arrays
     cell_starts = np.empty(total_cells)  # (total_cells, )
