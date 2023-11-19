@@ -10,7 +10,7 @@ import math
 
 from pyBL.models import BaseBLRP, BaseBLRP_RCIModel, Stat_Props
 from pyBL.timeseries import IntensityMRLE
-import numba as nb
+import numba as nb # type: ignore
 
 
 @dataclass
@@ -243,7 +243,7 @@ class BLRPRx(BaseBLRP):
         return IntensityMRLE.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
     '''
     k: lag
@@ -267,7 +267,7 @@ def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
     )
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_mean(
     timescale: float,
     lambda_: float,
@@ -283,7 +283,7 @@ def _blrprx_mean(
     return timescale * lambda_ * iota * mu_c * _blrprx_kernel(0, 0, nu, alpha)
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_variance(
     timescale: float,
     lambda_: float,
@@ -315,7 +315,7 @@ def _blrprx_variance(
     )
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_covariance(
     timescale: float,
     lambda_: float,
@@ -349,7 +349,7 @@ def _blrprx_covariance(
     return lambda_ * mu_c * iota**2 * (cov_part1 - cov_part2)
 
 
-@nb.njit
+@nb.njit()
 def _blrprx_moment_3rd(
     timescale: float,
     lambda_: float,
