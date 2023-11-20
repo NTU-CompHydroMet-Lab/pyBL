@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable
 
 import numpy as np
 import numpy.typing as npt
@@ -232,7 +232,8 @@ class BLRPRx(BaseBLRP):
         return cell_arr
 
     def sample(self, duration_hr: float) -> IntensityMRLE:
-        cell_arr = self.sample_raw(duration_hr)
+        #cell_arr = self.sample_raw(duration_hr)
+        cell_arr = _blrprx_sample(*self.get_params().unpack(), duration_hr, self.rci_model.sample_intensity, self.rng)
         delta = np.concatenate(
             [
                 np.stack([cell_arr[:, 0], cell_arr[:, 2]]).T,
@@ -241,7 +242,6 @@ class BLRPRx(BaseBLRP):
             axis=0,
         )
         return IntensityMRLE.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
-
 
 @nb.njit()
 def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
@@ -478,3 +478,70 @@ def _blrprx_moment_3rd(
         + m3_part7
         + m3_part8
     )
+
+@nb.njit()
+def _blrprx_sample(
+    lambda_: float,
+    phi: float,
+    kappa: float,
+    alpha: float,
+    nu: float,
+    sigmax_mux: float,
+    iota: float,
+    duration_hr: float,
+    intensity_sampler: Callable[[np.random.Generator, float, float, int], npt.NDArray[np.float64]],
+    rng: np.random.Generator,
+) -> npt.NDArray[np.float64]:
+    # Storm number sampling
+    n_storm = rng.poisson(lambda_ * duration_hr)
+
+    total_cells: int = 0
+    eta = np.empty(n_storm, dtype=np.float64)
+    mux = np.empty(n_storm, dtype=np.float64)
+    storm_starts = np.empty(n_storm, dtype=np.float64)
+    storm_durations = np.empty(n_storm, dtype=np.float64)
+    n_cells_per_storm = np.empty(n_storm, dtype=np.int64)
+    for i in range(n_storm):
+        eta[i] = rng.gamma(alpha, 1 / nu)
+        gamma = phi * eta[i]
+        beta = kappa * eta[i]
+        mux[i] = iota * eta[i] # mux = iota * eta
+        storm_starts[i] = rng.uniform(0, duration_hr) # storm_starts = rng.uniform(0, duration_hr, n_storm)
+        storm_durations[i] = rng.exponential(1 / gamma) # storm_durations = rng.exponential(1 / gamma, n_storm)
+        n_cells_per_storm[i] = 1 + rng.poisson(beta * storm_durations[i]) # n_cells_per_storm = 1 + rng.poisson(beta * storm_durations, size=n_storm)
+        total_cells += n_cells_per_storm[i]
+    
+
+    # Pre-allocate arrays
+    cell_starts = np.empty(total_cells)  # (total_cells, )
+    cell_durations = np.empty(total_cells)  # (total_cells, )
+    cell_intensities = np.empty(total_cells)  # (total_cells, )
+
+    cells_start_idx = 0
+    for i, (s, d) in enumerate(zip(storm_starts, storm_durations)):
+        cell_starts[
+            cells_start_idx
+        ] = s  # First cell starts at the same time as the storm
+        cell_starts[
+            cells_start_idx + 1 : cells_start_idx + n_cells_per_storm[i]
+        ] = rng.uniform(s, s + d, n_cells_per_storm[i] - 1)
+
+        cell_durations[
+            cells_start_idx : cells_start_idx + n_cells_per_storm[i]
+        ] = rng.exponential(scale=1 / eta[i], size=n_cells_per_storm[i])
+
+        cell_intensities[
+            cells_start_idx : cells_start_idx + n_cells_per_storm[i]
+        ] = intensity_sampler(
+            rng=rng, mux=mux[i], sigmax_mux=sigmax_mux, n_cells=n_cells_per_storm[i]
+        )
+        cells_start_idx += n_cells_per_storm[i]
+
+    cell_ends = cell_starts + cell_durations  # (total_cells, )
+
+    # Flatten cell_starts, cell_ends, cell_intensities and stack them together
+    cell_arr = np.stack(
+        (cell_starts, cell_ends, cell_intensities), axis=-1
+    )  # (total_cells, 3)
+
+    return cell_arr

@@ -7,15 +7,9 @@ from pyBL.fitting import BLRPRxFitter
 from pyBL.models import BLRPRx, Stat_Props, BLRPRx_params
 import os
 import pandas as pd
+import scipy as sp
 
 timescale = [1, 3600, 3 * 3600, 6 * 3600, 24 * 3600]
-props = [
-    Stat_Props.MEAN,
-    Stat_Props.CVAR,
-    Stat_Props.AR1,
-    Stat_Props.SKEWNESS,
-    Stat_Props.pDRY,
-]
 
 # Set timezone to UTC
 os.environ["TZ"] = "UTC"
@@ -122,13 +116,18 @@ mask[Stat_Props.SKEWNESS] = [1, 1, 1, 1]
 config = BLRPRxConfig(target=target, weight=weight, mask=mask)
 obj_func = config.get_evaluation_func()
 arr = np.array([0.016679733103341976, 0.08270236178820184, 0.34970877070925505, 9.017352714561754, 0.9931496975448589, 1.0, 0.971862948182735])
-params = BLRPRx_params(*arr)
 
 old_config = BLRPRxFitter()
 model = BLRPRx()
 
 print(obj_func(arr))
-print(old_config.evaluate(params, target_np, weight_np, model))
 
-print(timeit.timeit(lambda: obj_func(arr), number=100000))
-print(timeit.timeit(lambda: old_config._evaluate(arr, target_np, weight_np, model), number=100000))
+#print(timeit.timeit(lambda: obj_func(arr), number=1000000))
+#print(timeit.timeit(lambda: old_config._evaluate(arr, target_np, weight_np, model), number=100000))
+result = sp.optimize.dual_annealing(obj_func, x0=arr, bounds=[(0.000001, 20)] * 7, maxiter=10000)
+# Print result.x with maximum precision
+print(result.x.astype(np.float64))
+print(obj_func(result.x))
+result = sp.optimize.dual_annealing(obj_func, x0=arr, bounds=[(0.000001, 20)] * 7, maxiter=10000)
+print(result.x.astype(np.float64))
+print(obj_func(result.x))

@@ -1,22 +1,15 @@
-from pyBL.timeseries import IntensityMRLE
-from pyBL.fitting import BLRPRxFitter
-from pyBL.models import BLRPRx, Stat_Props, BLRPRx_params
+from pyBL.fitting import BLRPRxConfig
+from pyBL.utils.timeseries import preprocess_classic
+from pyBL.models import Stat_Props, BLRPRx_params, BLRPRx
 import os
 import pandas as pd
 import numpy as np
+import scipy as sp
 
-timescale = [1, 3600, 3 * 3600, 6 * 3600, 24 * 3600]
-props = [
-    Stat_Props.MEAN,
-    Stat_Props.CVAR,
-    Stat_Props.AR1,
-    Stat_Props.SKEWNESS,
-    Stat_Props.pDRY,
-]
+timescale = np.array([1, 3, 6, 24])
 
 # Set timezone to UTC
 os.environ["TZ"] = "UTC"
-
 
 def rain_timeseries():
     data_path = os.path.join(os.path.dirname(__file__), "data", "elmdon.csv")
@@ -26,79 +19,51 @@ def rain_timeseries():
     intensity = data["Elmdon"].to_numpy()
     return time, intensity
 
-
-def month_start_end():
-    # Generate first day of each month from 1980 to 2010
-    day = pd.date_range(start="1980-01-01", end="2000-01-01", freq="MS")
-    # Convert to unix time
-    month_srt = day.astype("int64") // 10**9
-    month_end = month_srt
-    # Stack them together
-    month_interval = np.stack((month_srt[:-1], month_end[1:]), axis=1)
-    # Group the month_interval by month
-    month_interval = np.reshape(month_interval, (-1, 12, 2))
-    return month_interval
-
-
 time, intensity = rain_timeseries()
-mrle = IntensityMRLE(time, intensity / 3600)
-month_interval_each_year = month_start_end()
 
-# Segment the mrle timeseries into months from 1900 to 2100
-mrle_month_each = np.empty(
-    (12, len(month_interval_each_year), 5), dtype=IntensityMRLE
-)  # (month, year, scale)
-for i, year in enumerate(month_interval_each_year):
-    for j, month in enumerate(year):
-        for k, scale in enumerate(timescale):
-            mrle_month_each[j, i, k] = mrle[month[0] : month[1]].rescale(
-                scale
-            )  # 1s scale
+# Prepare target and weight
+target, weight = preprocess_classic(time, intensity, timescale=timescale)
 
-# MRLE that stores the total of each month
-mrle_month_total = np.empty((12, 5), dtype=IntensityMRLE)  # (month, scale)
-for i in range(12):
-    for j in range(len(mrle_month_each[0])):
-        for k, scale in enumerate(timescale):
-            if j == 0:
-                mrle_month_total[i, k] = IntensityMRLE(scale=scale)
-            mrle_month_total[i, k].add(mrle_month_each[i, j, k], sequential=True)
-
-stats_month = np.zeros((12, 5, 5))  # (month, scale, stats)
+# Optimize
 for month in range(12):
-    for scale in range(5):
-        model = mrle_month_total[month, scale]
-        stats_month[month, scale, :] = [
-            model.mean(),
-            model.cvar(),
-            model.acf(),
-            model.skewness(),
-            model.pDry(0),
-        ]
+    # Setting up the objective function
+    target_df = BLRPRxConfig.default_target()
+    target_df[Stat_Props.MEAN] = target[month, :, 0]
+    target_df[Stat_Props.CVAR] = target[month, :, 1]
+    target_df[Stat_Props.AR1] = target[month, :, 2]
+    target_df[Stat_Props.SKEWNESS] = target[month, :, 3]
 
-stats_month_seperate = np.zeros(
-    (12, len(month_interval_each_year), 5, 5)
-)  # (month, year, scale, stats)
-for month in range(12):
-    for year in range(len(month_interval_each_year)):
-        for scale in range(5):
-            model = mrle_month_each[month, year, scale]
-            stats_month_seperate[month, year, scale, :] = [
-                model.mean(),
-                model.cvar(),
-                model.acf(),
-                model.skewness(),
-                model.pDry(0),
-            ]
+    weight_df = BLRPRxConfig.default_weight()
+    weight_df[Stat_Props.MEAN] = weight[month, :, 0]
+    weight_df[Stat_Props.CVAR] = weight[month, :, 1]
+    weight_df[Stat_Props.AR1] = weight[month, :, 2]
+    weight_df[Stat_Props.SKEWNESS] = weight[month, :, 3]
 
-stats_weight = 1 / np.nanvar(
-    stats_month_seperate, axis=1
-)  # (month, scale, stats) (12, 5, 5)
+    mask_df = BLRPRxConfig.default_mask()
+    mask_df[Stat_Props.MEAN] = [1, 0, 0, 0]
+    mask_df[Stat_Props.CVAR] = [1, 1, 1, 1]
+    mask_df[Stat_Props.AR1] = [1, 1, 1, 1]
+    mask_df[Stat_Props.SKEWNESS] = [1, 1, 1, 1]
 
-target = stats_month[:, 1:, :]
-weight = stats_weight[:, 1:, :]
+    fitter = BLRPRxConfig(target_df, weight_df, mask_df)
 
-fitter = BLRPRxFitter()
-result, model = fitter.fit(target[0], weight[0])
-print(result)
-print(result.x.tolist())
+    obj = fitter.get_evaluation_func()
+    result = sp.optimize.dual_annealing(obj, bounds=[(0.000001, 20)] * 7, maxiter=10000)
+    print(result)
+    result_params = BLRPRx_params(*result.x)
+    model = BLRPRx(result_params)
+    for scale in timescale:
+        print(model.get_prop(Stat_Props.MEAN, timescale=scale), end=" ")
+        print(model.get_prop(Stat_Props.CVAR, timescale=scale), end=" ")
+        print(model.get_prop(Stat_Props.AR1, timescale=scale), end=" ")
+        print(model.get_prop(Stat_Props.SKEWNESS, timescale=scale))
+    
+    result = sp.optimize.dual_annealing(obj, bounds=[(0.000001, 20)] * 7, maxiter=10000, x0=result.x)
+    print(result)
+    result_params = BLRPRx_params(*result.x)
+    model = BLRPRx(result_params)
+    for scale in timescale:
+        print(model.get_prop(Stat_Props.MEAN, timescale=scale), end=" ")
+        print(model.get_prop(Stat_Props.CVAR, timescale=scale), end=" ")
+        print(model.get_prop(Stat_Props.AR1, timescale=scale), end=" ")
+        print(model.get_prop(Stat_Props.SKEWNESS, timescale=scale))

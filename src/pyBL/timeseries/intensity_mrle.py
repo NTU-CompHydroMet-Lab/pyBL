@@ -80,7 +80,7 @@ class IntensityMRLE:
             Delta Encoded Intensity values (mm/h) of the intensity timeseries.
 
         """
-        time, intensity_mrle = _delta_to_mrle(time, intensity_delta)
+        time, intensity_mrle = _delta_to_mrle_nb(time, intensity_delta)
 
         return cls(time, intensity_mrle, scale)
 
@@ -220,7 +220,7 @@ class IntensityMRLE:
             return np.nan
         return _mrle_coef_var(self._time, self._intensity, biased=biased)
 
-    def skewness(self, biased_sd=True) -> float:
+    def skewness(self, biased=True) -> float:
         '''
         Calculate the skewness of the intensity timeseries.
         The standard deviation is calculated with the biased estimator.
@@ -236,7 +236,7 @@ class IntensityMRLE:
         '''
         if self._time.size == 0:
             return np.nan
-        return _mrle_skew(self._time, self._intensity, biased=biased_sd)
+        return _mrle_skew(self._time, self._intensity, biased=biased)
 
     def pDry(self, threshold: float=0) -> float:
         '''
@@ -324,35 +324,33 @@ def _mrle_check(
 
     return time, intensity
 
-
-@overload
-def _delta_to_mrle(
-    time: IMRLESequence,
-    intensity_delta: IMRLESequence,
-):
-    ...
-
-
-@overload
-def _delta_to_mrle(
-    time: None, intensity_delta: None, delta_encoding: npt.NDArray[np.float64]
-):
-    ...
-
-
 def _delta_to_mrle(
     time: IMRLESequence = None,
     intensity_delta: IMRLESequence = None,
-    delta_encoding: Optional[npt.NDArray[np.float64]] = None,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    if delta_encoding is None:
-        if not isinstance(time, np.ndarray):
-            time = np.array(time, dtype=np.float64)
-        if not isinstance(intensity_delta, np.ndarray):
-            intensity_delta = np.array(intensity_delta, dtype=np.float64)
+    '''
+    ### This is an internal function. You shouldn't use it directly unless you know what you are doing.  
 
-        # Zip time and intensity_delta into a 2D array
-        delta_encoding = np.column_stack((time, intensity_delta))
+    This function convert the delta encoding of the intensity timeseries into **ALMOST** MRLE format.  
+    The np.nan at the end of the intensity timeseries is not included in the MRLE format.
+
+    Parameters
+    ----------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows delta encoding format.
+    intensity_delta : npt.NDArray[np.float64]
+        1D array of intensity that follows delta encoding format.
+    
+    Returns
+    -------
+    time : npt.NDArray[np.float64]
+        1D array of time index that follows MRLE format (Without the np.nan at the end).
+    intensity : npt.NDArray[np.float64]
+        1D array of intensity that follows MRLE format (Without the np.nan at the end).  
+    '''
+
+    # Zip time and intensity_delta into a 2D array    
+    delta_encoding = np.column_stack((time, intensity_delta))
 
     # Sort the change_time_idx by time
     delta_encoding = delta_encoding[np.argsort(delta_encoding[:, 0])]
@@ -360,7 +358,7 @@ def _delta_to_mrle(
     # Calculate the cumulative sum of the intensity changes inplace.
     np.cumsum(delta_encoding[:, 1], out=delta_encoding[:, 1])
 
-    # TODO: Round to 10 decimal places to avoid floating point errors. And it's inplace.
+    ## TODO: Round to 10 decimal places to avoid floating point errors. And it's inplace.
     delta_encoding.round(10, out=delta_encoding)
 
     # Remove duplicate times by keeping the last occurence
@@ -373,6 +371,35 @@ def _delta_to_mrle(
     return (
         delta_encoding[:, 0][unique_indices],
         delta_encoding[:, 1][unique_indices],
+    )
+
+# Signature of two float64 arrays input and two float64 arrays output
+@nb.njit('UniTuple(f8[:], 2)(f8[:], f8[:])')
+def _delta_to_mrle_nb(
+    time: IMRLESequence = None,
+    intensity_delta: IMRLESequence = None,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    # Sort the change_time_idx by time
+    sorted_idx = np.argsort(time)
+    time = time[sorted_idx]
+    intensity_delta = intensity_delta[sorted_idx]
+
+    # Calculate the cumulative sum of the intensity changes inplace.
+    for i in range(1, len(intensity_delta)):
+        intensity_delta[i] += intensity_delta[i-1]
+
+    ## TODO: Round to 10 decimal places to avoid floating point errors. And it's inplace.
+    #delta_encoding.round(10, out=delta_encoding)
+
+    # Remove duplicate times by keeping the last occurence
+    diff_idx = np.empty(len(time), dtype=np.bool_)
+    for i in range(len(time)-1, 0, -1):
+        diff_idx[i-1] = time[i] != time[i-1]
+    diff_idx[-1] = True
+
+    return (
+        time[diff_idx],
+        intensity_delta[diff_idx],
     )
 
 def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
