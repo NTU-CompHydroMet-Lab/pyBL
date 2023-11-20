@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Protocol, Type, Union
 
 import numpy as np
-import scipy as sp  # type: ignore
-import math
 
 from pyBL.raincell import ExponentialRCIModel, IConstantRCI
 
@@ -53,8 +52,6 @@ class BaseBLRP(Protocol):
             self.rci_model = ExponentialRCIModel()
         elif isinstance(rci_model, IConstantRCI):
             self.rci_model = rci_model
-        elif isinstance(rci_model(), IConstantRCI):
-            self.rci_model = rci_model()
         else:
             raise TypeError("rci_model must be a implementation of IConstantRCI")
 

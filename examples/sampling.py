@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 ## Experiment configuration
 sample_size = 1000
 sample_duration = 1000000
-rng = np.random.default_rng()
+rng = np.random.default_rng(100)
 params = BLRPRx_params(
     lambda_=0.016679733103341976,
     phi=0.08270236178820184,
@@ -52,11 +52,12 @@ for exp in range(sample_size):
         result_df[exp].loc[scale, "Skewness"] = ts_rescale[i].skewness()
 
     result[exp] = result_df[exp].to_numpy()
+    print(f"Experiment {exp} completed")
 
 ## Plot the results
 for i, scale in enumerate([1, 3, 6, 24]):
     # Set the font size
-    plt.rcParams.update({"font.size": 8})
+    plt.rcParams.update({"font.size": 6})
     # Plot bin chart for mean, cvar, ar1, skewness
     fig, axs = plt.subplots(2, 2)
     fig.suptitle(

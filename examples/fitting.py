@@ -48,6 +48,8 @@ for month in range(12):
     fitter = BLRPRxConfig(target_df, weight_df, mask_df)
 
     obj = fitter.get_evaluation_func()
+
+    # Fitting
     result = sp.optimize.dual_annealing(obj, bounds=[(0.000001, 20)] * 7, maxiter=10000)
     print(result)
     result_params = BLRPRx_params(*result.x)

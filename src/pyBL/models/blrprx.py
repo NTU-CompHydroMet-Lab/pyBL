@@ -1,16 +1,15 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
-from typing import Optional, Tuple, Callable
+from typing import Callable, Optional, Tuple
 
+import numba as nb  # type: ignore
 import numpy as np
 import numpy.typing as npt
-import scipy as sp  # type: ignore
-import math
 
 from pyBL.models import BaseBLRP, BaseBLRP_RCIModel, Stat_Props
 from pyBL.timeseries import IntensityMRLE
-import numba as nb # type: ignore
 
 
 @dataclass
@@ -50,10 +49,6 @@ class BLRPRx(BaseBLRP):
         "rci_model",
         "rng",
         "params",
-        "cache_mean",
-        "cache_variance",
-        "cache_covariance",
-        "cache_moment_3rd",
     )
 
     def __init__(
@@ -77,11 +72,6 @@ class BLRPRx(BaseBLRP):
         else:
             self.params = params.copy()
 
-        self.cache_mean = {}
-        self.cache_variance = {}
-        self.cache_covariance = {}
-        self.cache_moment_3rd = {}
-
     def copy(self, rng: Optional[np.random.Generator] = None) -> BLRPRx:
         if rng is None:
             rng = np.random.default_rng(self.rng)
@@ -97,53 +87,25 @@ class BLRPRx(BaseBLRP):
 
     def update_params(self, params: BLRPRx_params) -> None:
         self.params = params.copy()
-        self.cache_mean = {}
-        self.cache_variance = {}
-        self.cache_covariance = {}
-        self.cache_moment_3rd = {}
 
     def _kernel(self, k: float, u: float, nu: float, alpha: float) -> float:
         return _blrprx_kernel(k, u, nu, alpha)
 
     def mean(self, timescale: float = 1.0) -> float:
-        if timescale not in self.cache_mean:
-            self.cache_mean[timescale] = _blrprx_mean(
-                timescale, *self.get_params().unpack()
-            )
-        return self.cache_mean[timescale]
+        return _blrprx_mean(timescale, *self.get_params().unpack())
 
     def variance(self, timescale: float = 1.0) -> float:
         f1 = self.rci_model.get_f1(sigmax_mux=self.params.sigmax_mux)
-        if timescale not in self.cache_variance:
-            self.cache_variance[timescale] = _blrprx_variance(
-                timescale,
-                *self.get_params().unpack(),
-                f1,
-            )
-        return self.cache_variance[timescale]
+        return _blrprx_variance(timescale, f1, *self.get_params().unpack())
 
     def covariance(self, timescale: float = 1.0, lag: float = 1.0) -> float:
         f1 = self.rci_model.get_f1(sigmax_mux=self.params.sigmax_mux)
-        if timescale not in self.cache_covariance:
-            self.cache_covariance[timescale] = _blrprx_covariance(
-                timescale,
-                *self.get_params().unpack(),
-                f1,
-                lag,
-            )
-        return self.cache_covariance[timescale]
+        return _blrprx_covariance(timescale, f1, lag, *self.get_params().unpack())
 
     def moment_3rd(self, timescale: float = 1.0) -> float:
         f1 = self.rci_model.get_f1(sigmax_mux=self.params.sigmax_mux)
         f2 = self.rci_model.get_f2(sigmax_mux=self.params.sigmax_mux)
-        if timescale not in self.cache_moment_3rd:
-            self.cache_moment_3rd[timescale] = _blrprx_moment_3rd(
-                timescale,
-                *self.get_params().unpack(),
-                f1,
-                f2,
-            )
-        return self.cache_moment_3rd[timescale]
+        return _blrprx_moment_3rd(timescale, f1, f2, *self.get_params().unpack())
 
     def get_prop(
         self,
@@ -232,8 +194,13 @@ class BLRPRx(BaseBLRP):
         return cell_arr
 
     def sample(self, duration_hr: float) -> IntensityMRLE:
-        #cell_arr = self.sample_raw(duration_hr)
-        cell_arr = _blrprx_sample(*self.get_params().unpack(), duration_hr, self.rci_model.sample_intensity, self.rng)
+        # cell_arr = self.sample_raw(duration_hr)
+        cell_arr = _blrprx_sample(
+            duration_hr,
+            self.rci_model.sample_intensity,
+            self.rng,
+            *self.get_params().unpack(),
+        )
         delta = np.concatenate(
             [
                 np.stack([cell_arr[:, 0], cell_arr[:, 2]]).T,
@@ -243,12 +210,13 @@ class BLRPRx(BaseBLRP):
         )
         return IntensityMRLE.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
 
+
 @nb.njit()
 def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
-    '''
+    """
     k: lag
     u: timescale
-    '''
+    """
     # Modelling rainfall with a Bartlett–Lewis process: new developments(2020) Formula (5)
 
     ## TODO: Check if this is still required.
@@ -286,6 +254,7 @@ def _blrprx_mean(
 @nb.njit()
 def _blrprx_variance(
     timescale: float,
+    f1: float,
     lambda_: float,
     phi: float,
     kappa: float,
@@ -293,7 +262,6 @@ def _blrprx_variance(
     nu: float,
     sigmax_mux: float,
     iota: float,
-    f1: float,
 ):
     mu_c = 1.0 + kappa / phi
 
@@ -318,6 +286,8 @@ def _blrprx_variance(
 @nb.njit()
 def _blrprx_covariance(
     timescale: float,
+    f1: float,
+    lag: float,
     lambda_: float,
     phi: float,
     kappa: float,
@@ -325,8 +295,6 @@ def _blrprx_covariance(
     nu: float,
     sigmax_mux: float,
     iota: float,
-    f1: float,
-    lag: float,
 ):
     mu_c = 1.0 + kappa / phi
 
@@ -352,6 +320,8 @@ def _blrprx_covariance(
 @nb.njit()
 def _blrprx_moment_3rd(
     timescale: float,
+    f1: float,
+    f2: float,
     lambda_: float,
     phi: float,
     kappa: float,
@@ -359,8 +329,6 @@ def _blrprx_moment_3rd(
     nu: float,
     sigmax_mux: float,
     iota: float,
-    f1: float,
-    f2: float,
 ):
     mu_c = 1.0 + kappa / phi
 
@@ -479,8 +447,14 @@ def _blrprx_moment_3rd(
         + m3_part8
     )
 
+
 @nb.njit()
 def _blrprx_sample(
+    duration_hr: float,
+    intensity_sampler: Callable[
+        [np.random.Generator, float, float, int], npt.NDArray[np.float64]
+    ],
+    rng: np.random.Generator,
     lambda_: float,
     phi: float,
     kappa: float,
@@ -488,9 +462,6 @@ def _blrprx_sample(
     nu: float,
     sigmax_mux: float,
     iota: float,
-    duration_hr: float,
-    intensity_sampler: Callable[[np.random.Generator, float, float, int], npt.NDArray[np.float64]],
-    rng: np.random.Generator,
 ) -> npt.NDArray[np.float64]:
     # Storm number sampling
     n_storm = rng.poisson(lambda_ * duration_hr)
@@ -505,12 +476,17 @@ def _blrprx_sample(
         eta[i] = rng.gamma(alpha, 1 / nu)
         gamma = phi * eta[i]
         beta = kappa * eta[i]
-        mux[i] = iota * eta[i] # mux = iota * eta
-        storm_starts[i] = rng.uniform(0, duration_hr) # storm_starts = rng.uniform(0, duration_hr, n_storm)
-        storm_durations[i] = rng.exponential(1 / gamma) # storm_durations = rng.exponential(1 / gamma, n_storm)
-        n_cells_per_storm[i] = 1 + rng.poisson(beta * storm_durations[i]) # n_cells_per_storm = 1 + rng.poisson(beta * storm_durations, size=n_storm)
+        mux[i] = iota * eta[i]  # mux = iota * eta
+        storm_starts[i] = rng.uniform(
+            0, duration_hr
+        )  # storm_starts = rng.uniform(0, duration_hr, n_storm)
+        storm_durations[i] = rng.exponential(
+            1 / gamma
+        )  # storm_durations = rng.exponential(1 / gamma, n_storm)
+        n_cells_per_storm[i] = 1 + rng.poisson(
+            beta * storm_durations[i]
+        )  # n_cells_per_storm = 1 + rng.poisson(beta * storm_durations, size=n_storm)
         total_cells += n_cells_per_storm[i]
-    
 
     # Pre-allocate arrays
     cell_starts = np.empty(total_cells)  # (total_cells, )
@@ -532,9 +508,7 @@ def _blrprx_sample(
 
         cell_intensities[
             cells_start_idx : cells_start_idx + n_cells_per_storm[i]
-        ] = intensity_sampler(
-            rng=rng, mux=mux[i], sigmax_mux=sigmax_mux, n_cells=n_cells_per_storm[i]
-        )
+        ] = intensity_sampler(rng, mux[i], sigmax_mux, n_cells_per_storm[i])
         cells_start_idx += n_cells_per_storm[i]
 
     cell_ends = cell_starts + cell_durations  # (total_cells, )

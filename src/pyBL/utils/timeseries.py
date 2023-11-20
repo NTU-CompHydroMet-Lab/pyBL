@@ -1,12 +1,18 @@
-import numpy as np
-import pandas as pd # type: ignore
-import numpy.typing as npt
-from pyBL.timeseries import IntensityMRLE
 from datetime import datetime, timezone
 from typing import Optional, Union
 
-def get_month_intervals(start: Optional[Union[int, datetime]] = None, end: Optional[Union[int, datetime]] = None) -> npt.NDArray:
-    '''
+import numpy as np
+import numpy.typing as npt
+import pandas as pd  # type: ignore
+
+from pyBL.timeseries import IntensityMRLE
+
+
+def get_month_intervals(
+    start: Optional[Union[int, datetime]] = None,
+    end: Optional[Union[int, datetime]] = None,
+) -> npt.NDArray[np.float64]:
+    """
     ### Note that the returned unix time is `UTC`.
     Generate a 2D matrix of (nYear, 12, 2) of unix time interval of each month with its start and exclusive end unix time.
 
@@ -16,12 +22,12 @@ def get_month_intervals(start: Optional[Union[int, datetime]] = None, end: Optio
         Start Year, default to be 1900
     end : int, datetime, None
         End Year, default to be 2100
-    
+
     Returns
     -------
     np.ndarray
         2D matrix of (nYear, 12, 2) of unix time interval of each month with its start and exclusive end unix time.
-    '''
+    """
     if isinstance(start, int):
         start = datetime(start, 1, 1, 0, 0, 0)
     if isinstance(end, int):
@@ -31,9 +37,9 @@ def get_month_intervals(start: Optional[Union[int, datetime]] = None, end: Optio
         start = datetime(1900, 1, 1, 0, 0, 0)
     if end is None:
         end = datetime(2100, 1, 1, 0, 0, 0)
-    day = pd.date_range(start=start, end=end, freq='MS')
+    day = pd.date_range(start=start, end=end, freq="MS")
     # Convert to unix time
-    month_srt = day.astype("int64") // 10 ** 9
+    month_srt = day.astype("int64") // 10**9
     month_end = month_srt
     # Stack them together
     month_intervals = np.stack((month_srt[:-1], month_end[1:]), axis=1)
@@ -41,8 +47,11 @@ def get_month_intervals(start: Optional[Union[int, datetime]] = None, end: Optio
     month_intervals = np.reshape(month_intervals, (-1, 12, 2))
     return month_intervals
 
-def to_year_month(unix_time: npt.NDArray, intensity: npt.NDArray) -> npt.NDArray:
-    '''
+
+def to_year_month(
+    unix_time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
+) -> npt.NDArray[np.float64]:
+    """
     Convert input 1D array of unix time and intensity to 2D matrix of year and month.
     With the shape of (nYear, 12). Each cell in the 2D matrix is a `IntensityMRLE` object of that month.
 
@@ -56,9 +65,9 @@ def to_year_month(unix_time: npt.NDArray, intensity: npt.NDArray) -> npt.NDArray
     Returns
     -------
     npt.NDArray
-        2D matrix of year and month full of `IntensityMRLE` objects.  
+        2D matrix of year and month full of `IntensityMRLE` objects.
         With the shape of (nYear, 12).
-    '''
+    """
     mrle = IntensityMRLE(unix_time, intensity / 3600)
     # Gest starting year and ending year
     start_year = datetime.fromtimestamp(unix_time[0], tz=timezone.utc).year
@@ -70,7 +79,7 @@ def to_year_month(unix_time: npt.NDArray, intensity: npt.NDArray) -> npt.NDArray
     for i, year in enumerate(month_interval_each_year):
         for j, month in enumerate(year):
             mrleYearMonth[i, j] = mrle[month[0] : month[1]]
-    
+
     # Find the first row that doesn't have any IntensityMRLE object
     for i, row in enumerate(mrleYearMonth):
         if np.isnan(row[0].mean()):
@@ -78,33 +87,40 @@ def to_year_month(unix_time: npt.NDArray, intensity: npt.NDArray) -> npt.NDArray
 
     return mrleYearMonth
 
-def preprocess_classic(unix_time: np.ndarray, intensity: np.ndarray, timescale: np.ndarray) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    '''
+
+def preprocess_classic(
+    unix_time: npt.NDArray[np.float64],
+    intensity: npt.NDArray[np.float64],
+    timescale: npt.NDArray[np.float64],
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    """
     This function calculate the statistics of the input timeseries and return the target and weight matrix for fitting.
 
     Parameters
     ----------
-    unix_time : np.ndarray 
+    unix_time : np.ndarray
         1D array of unix time. Unit: second
-    
+
     intensity : np.ndarray
         1D array of intensity data. Unit: mm/h
 
     timescale : np.ndarray
         1D array of timescale. Unit: hour
-    
+
     Returns
     -------
     target : np.ndarray
         3D matrix of target. With the shape of (12 (month), nScale, nStats).
-    
+
     weight : np.ndarray
         3D matrix of weight. With the shape of (12 (month), nScale, nStats).
-    '''
+    """
     timescale = np.array(timescale)
-    timescale = timescale * 3600 # Convert to second
+    timescale = timescale * 3600  # Convert to second
 
-    mrle = IntensityMRLE(unix_time, intensity/3600) # Unit: mm/h so divide by 3600 to get mm/s
+    mrle = IntensityMRLE(
+        unix_time, intensity / 3600
+    )  # Unit: mm/h so divide by 3600 to get mm/s
     month_interval_each_year = get_month_intervals()
     # Segment the mrle timeseries into months from 1900 to 2100
     mrle_month_each = np.empty(
@@ -113,12 +129,12 @@ def preprocess_classic(unix_time: np.ndarray, intensity: np.ndarray, timescale: 
     for i, year in enumerate(month_interval_each_year):
         for j, month in enumerate(year):
             for k, scale in enumerate(timescale):
-                mrle_month_each[j, i, k] = mrle[month[0] : month[1]].rescale(
-                    scale
-                )
+                mrle_month_each[j, i, k] = mrle[month[0] : month[1]].rescale(scale)
 
     # MRLE that stores the total of each month
-    mrle_month_total = np.empty((12, len(timescale)), dtype=IntensityMRLE)  # (month, scale)
+    mrle_month_total = np.empty(
+        (12, len(timescale)), dtype=IntensityMRLE
+    )  # (month, scale)
     for i in range(12):
         for j in range(len(mrle_month_each[0])):
             for k, scale in enumerate(timescale):
@@ -153,8 +169,6 @@ def preprocess_classic(unix_time: np.ndarray, intensity: np.ndarray, timescale: 
                     model.pDry(0),
                 ]
 
-    stats_weight = 1 / np.nanvar(
-        stats_month_seperate, axis=1
-    )  # (month, scale, stats)
+    stats_weight = 1 / np.nanvar(stats_month_seperate, axis=1)  # (month, scale, stats)
 
     return stats_month, stats_weight
