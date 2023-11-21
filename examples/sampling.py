@@ -1,4 +1,4 @@
-from pyBL.models import BLRPRx, Stat_Props, BLRPRx_params
+from pybl.models import BLRPRx, Stat_Props, BLRPRx_params
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
