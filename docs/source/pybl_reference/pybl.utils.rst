@@ -1,13 +1,13 @@
-fitting package
-===============
+pybl.utils package
+==================
 
 Submodules
 ----------
 
-fitting.fitter module
----------------------
+pybl.utils.timeseries module
+----------------------------
 
-.. automodule:: fitting.fitter
+.. automodule:: pybl.utils.timeseries
    :members:
    :undoc-members:
    :show-inheritance:
@@ -15,7 +15,7 @@ fitting.fitter module
 Module contents
 ---------------
 
-.. automodule:: fitting
+.. automodule:: pybl.utils
    :members:
    :undoc-members:
    :show-inheritance:
