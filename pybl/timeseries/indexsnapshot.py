@@ -12,14 +12,14 @@ import numba as nb  # type: ignore
 import numpy as np
 import numpy.typing as npt
 
-__all__ = ["IntensityMRLE"]
+__all__ = ["IndexedShapshot"]
 
-IMRLESequence = Optional[
+FloatArray = Optional[
     Union[npt.NDArray[np.float64], npt.NDArray[np.int64], List[float]]
 ]
 
 
-class IntensityMRLE:
+class IndexedShapshot:
     """
     This class stores timeseries in Modified Run-Length Encoding.
 
@@ -41,8 +41,8 @@ class IntensityMRLE:
 
     def __init__(
         self,
-        time: IMRLESequence = None,
-        intensity: IMRLESequence = None,
+        time: FloatArray = None,
+        intensity: FloatArray = None,
         scale: float = 1,
     ):
         """
@@ -54,7 +54,7 @@ class IntensityMRLE:
         intensity: Optional[Union[`np.ndarray`, `List`]]
             Intensity values (mm/h) of the intensity timeseries.
         """
-        self._time, self._intensity = _mrle_check(time, intensity)
+        self._time, self._intensity = _ishapshot_check(time, intensity)
         if len(self._time) != 0:
             self._intensity_delta: npt.NDArray[np.float64] = np.column_stack(
                 (self._time, np.diff(self._intensity[:-1], prepend=0, append=0))
@@ -65,12 +65,12 @@ class IntensityMRLE:
 
     @classmethod
     def fromDelta(
-        cls, time: IMRLESequence, intensity_delta: IMRLESequence, scale: int = 1
-    ) -> IntensityMRLE:
+        cls, time: FloatArray, intensity_delta: FloatArray, scale: int = 1
+    ) -> IndexedShapshot:
         """
-        Create an IntensityMRLE timeseries from the delta encoded intensity timeseries.
+        Create an IndexedShapshot timeseries from the delta encoded intensity timeseries.
 
-        Parameters:
+        Parameters
         ----------
         time: Optional[Union[`np.ndarray`, `List`]]
             Time index of the intensity timeseries.
@@ -90,19 +90,19 @@ class IntensityMRLE:
         ):
             intensity_delta = np.array(intensity_delta, dtype=np.float64)
 
-        time, intensity_mrle = _delta_to_mrle(time, intensity_delta)
+        time, intensity_ishapshot = _delta_to_ishapshot(time, intensity_delta)
 
-        return cls(time, intensity_mrle, scale)
+        return cls(time, intensity_ishapshot, scale)
 
     @property
     def time(self) -> npt.NDArray[np.float64]:
         """
-        Return the time index of the IntensityMRLE timeseries.
+        Return the time index of the IndexedShapshot timeseries.
 
         Returns
         -------
         time : npt.NDArray[np.float64]
-            1D array of time index that follows MRLE format.
+            1D array of time index that follows IndexedShapshot format.
             Ending time is for indicating the end of the timeseries.
         """
         return self._time
@@ -110,12 +110,12 @@ class IntensityMRLE:
     @property
     def intensity(self) -> npt.NDArray[np.float64]:
         """
-        Return the intensity of the IntensityMRLE timeseries.
+        Return the intensity of the IndexedShapshot timeseries.
 
         Returns
         -------
         intensity : npt.NDArray[np.float64]
-            1D array of intensity that follows MRLE format.
+            1D array of intensity that follows IndexedShapshot format.
             Ending intensity is for indicating the end of the timeseries. So it's np.nan.
         """
         return self._intensity
@@ -123,7 +123,7 @@ class IntensityMRLE:
     @property
     def intensity_delta(self) -> npt.NDArray[np.float64]:
         """
-        Return the delta encoded intensity of the IntensityMRLE timeseries.
+        Return the delta encoded intensity of the IndexedShapshot timeseries.
 
         Returns
         -------
@@ -134,14 +134,14 @@ class IntensityMRLE:
         """
         return self._intensity_delta
 
-    def add(self, timeseries: IntensityMRLE, sequential: bool = False) -> None:
+    def add(self, timeseries: IndexedShapshot, sequential: bool = False) -> None:
         """
-        Add another IntensityMRLE timeseries to the current IntensityMRLE timeseries.
+        Add another IndexedShapshot timeseries to the current IndexedShapshot timeseries.
 
         Parameters
         ----------
-        timeseries : IntensityMRLE
-            The IntensityMRLE timeseries to be added.
+        timeseries : IndexedShapshot
+            The IndexedShapshot timeseries to be added.
         sequential : bool, optional
             If False, the timeseries will be added as its original time index.  So overlapping timeseries will be summed together in the overlapping region.
             If True, the timeseries will be added sequentially. So the timeseries will be shifted to the right of the current timeseries.
@@ -151,26 +151,26 @@ class IntensityMRLE:
         if sequential is True:
             if len(self._time) != 0:
                 # Shift the start of the timeseries to be right after th last time of the current timeseries
-                timeseries = IntensityMRLE(
+                timeseries = IndexedShapshot(
                     timeseries.time - (timeseries.time[0] - self._time[-1]),
                     timeseries.intensity,
                     timeseries._scale,
                 )
         self.__iadd__(timeseries)
 
-    def __iadd__(self, timeseries: IntensityMRLE) -> IntensityMRLE:
-        result_mrle = _merge_mrle(self, timeseries)
+    def __iadd__(self, timeseries: IndexedShapshot) -> IndexedShapshot:
+        result_ishapshot = _merge_ishapshot(self, timeseries)
 
-        self._time, self._intensity = result_mrle._time, result_mrle._intensity
-        self._intensity_delta = result_mrle._intensity_delta
+        self._time, self._intensity = result_ishapshot._time, result_ishapshot._intensity
+        self._intensity_delta = result_ishapshot._intensity_delta
 
         return self
 
-    def __add__(self, timeseries: IntensityMRLE) -> IntensityMRLE:
-        return _merge_mrle(self, timeseries)
+    def __add__(self, timeseries: IndexedShapshot) -> IndexedShapshot:
+        return _merge_ishapshot(self, timeseries)
 
     @overload
-    def __getitem__(self, time_idx: slice) -> IntensityMRLE:
+    def __getitem__(self, time_idx: slice) -> IndexedShapshot:
         ...
 
     @overload
@@ -185,7 +185,7 @@ class IntensityMRLE:
         else:
             raise TypeError("time_idx must be an int or a slice")
 
-    def _get_slice_idx(self, time_idx: slice) -> IntensityMRLE:
+    def _get_slice_idx(self, time_idx: slice) -> IndexedShapshot:
         """
         ### This is an internal function. You shouldn't use it directly unless you know what you are doing.
         """
@@ -240,7 +240,7 @@ class IntensityMRLE:
         """
         if self._time.size == 0:
             return 0
-        return _mrle_total(self._time, self._intensity)
+        return _ishapshot_total(self._time, self._intensity)
 
     def mean(self) -> float:
         """
@@ -253,7 +253,7 @@ class IntensityMRLE:
         """
         if self._time.size == 0:
             return np.nan
-        return _mrle_mean(self._time, self._intensity)
+        return _ishapshot_mean(self._time, self._intensity)
 
     def acf(self, lag: Optional[float] = 1) -> float:
         """
@@ -271,7 +271,7 @@ class IntensityMRLE:
         """
         if self._time.size == 0:
             return np.nan
-        return _mrle_acf(self._time, self._intensity, lag=lag)
+        return _ishapshot_acf(self._time, self._intensity, lag=lag)
 
     def cvar(self, biased: Optional[bool] = False) -> float:
         """
@@ -288,7 +288,7 @@ class IntensityMRLE:
         """
         if self._time.size == 0:
             return np.nan
-        return _mrle_coef_var(self._time, self._intensity, biased=biased)
+        return _ishapshot_coef_var(self._time, self._intensity, biased=biased)
 
     def skewness(self, biased: Optional[bool] = True) -> float:
         """
@@ -306,7 +306,7 @@ class IntensityMRLE:
         """
         if self._time.size == 0:
             return np.nan
-        return _mrle_skew(self._time, self._intensity, biased=biased)
+        return _ishapshot_skew(self._time, self._intensity, biased=biased)
 
     def pDry(self, threshold: float = 0) -> float:
         """
@@ -323,29 +323,29 @@ class IntensityMRLE:
         """
         if self._time.size == 0:
             return np.nan
-        return _mrle_pDry(self._time, self._intensity, threshold=threshold)
+        return _ishapshot_pDry(self._time, self._intensity, threshold=threshold)
 
-    def rescale(self, scale: float) -> IntensityMRLE:
+    def rescale(self, scale: float) -> IndexedShapshot:
         """
-        Rescale the MRLE timeseries to a different scale.
+        Rescale the IndexedShapshot timeseries to a different scale.
         New time index will be divided by the scale. And the intensity will be multiplied by the scale.
         All the time index will be divisible by the scale.
         """
         if self._time.size == 0:
             return type(self)(scale=self._scale * scale)
-        scale_time, scale_intensity = _mrle_rescale(self._time, self._intensity, scale)
+        scale_time, scale_intensity = _ishapshot_rescale(self._time, self._intensity, scale)
         return type(self)(scale_time, scale_intensity, self._scale * scale)
 
     def unpack(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """
-        Unpack the MRLE timeseries into a normal timeseries.
+        Unpack the IndexedShapshot timeseries into a normal timeseries.
         """
         if self._time.size == 0:
             return np.array([], dtype=np.float64), np.array([], dtype=np.float64)
         else:
             if not np.all(self._time % 1 == 0):
                 print(
-                    "Warning: Unpacking MRLE with float time index. Resulting time index will be rounded to integer."
+                    "Warning: Unpacking IndexedShapshot with float time index. Resulting time index will be rounded to integer."
                 )
             diff_time = np.diff(self._time).astype(np.int64)
             intensity = np.repeat(self._intensity[:-1], diff_time)
@@ -353,9 +353,9 @@ class IntensityMRLE:
             return time, intensity
 
 
-def _mrle_check(
-    time: IMRLESequence = None,
-    intensity: IMRLESequence = None,
+def _ishapshot_check(
+    time: FloatArray = None,
+    intensity: FloatArray = None,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     # Check if both time and intensity are None
     if time is None or intensity is None:
@@ -384,21 +384,21 @@ def _mrle_check(
         time = np.append(time, time[-1] + 1)
         intensity = np.append(intensity, np.nan)
 
-    # Make sure it's in MRLE format
+    # Make sure it's in IndexedShapshot format
     intensity_idx = np.diff(intensity, prepend=-np.inf) != 0
 
     return np.array(time[intensity_idx]), np.array(intensity[intensity_idx])
 
 
-def _delta_to_mrle_archived(
+def _delta_to_ishapshot_archived(
     time: npt.NDArray[np.float64],
     intensity_delta: npt.NDArray[np.float64],
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
     ### This is an internal function. You shouldn't use it directly unless you know what you are doing.
 
-    This function convert the delta encoding of the intensity timeseries into **ALMOST** MRLE format.
-    The np.nan at the end of the intensity timeseries is not included in the MRLE format.
+    This function convert the delta encoding of the intensity timeseries into **ALMOST** IndexedShapshot format.
+    The np.nan at the end of the intensity timeseries is not included in the IndexedShapshot format.
 
     Parameters
     ----------
@@ -410,9 +410,9 @@ def _delta_to_mrle_archived(
     Returns
     -------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format (Without the np.nan at the end).
+        1D array of time index that follows IndexedShapshot format (Without the np.nan at the end).
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format (Without the np.nan at the end).
+        1D array of intensity that follows IndexedShapshot format (Without the np.nan at the end).
     """
 
     # Zip time and intensity_delta into a 2D array
@@ -442,7 +442,7 @@ def _delta_to_mrle_archived(
 
 # Signature of two float64 arrays input and two float64 arrays output
 @nb.njit("UniTuple(f8[:], 2)(f8[:], f8[:])")
-def _delta_to_mrle(
+def _delta_to_ishapshot(
     time: npt.NDArray[np.float64],
     intensity_delta: npt.NDArray[np.float64],
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -467,28 +467,28 @@ def _delta_to_mrle(
     )
 
 
-def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
+def _merge_ishapshot(a: IndexedShapshot, b: IndexedShapshot) -> IndexedShapshot:
     """
-    Merge two MRLE timeseries together.
+    Merge two IndexedShapshot timeseries together.
 
     Parameters
     ----------
-    a : IntensityMRLE
-        The first IntensityMRLE timeseries.
-    b : IntensityMRLE
-        The second IntensityMRLE timeseries.
+    a : IndexedShapshot
+        The first IndexedShapshot timeseries.
+    b : IndexedShapshot
+        The second IndexedShapshot timeseries.
 
     Returns
     -------
-    IntensityMRLE
-        The merged IntensityMRLE timeseries.
+    IndexedShapshot
+        The merged IndexedShapshot timeseries.
     """
     if a._scale != b._scale:
         raise ValueError(
             "Merging two timeseries with different scale is not supported '''YET'''."
         )
     if len(a.intensity_delta) == 0 and len(b.intensity_delta) == 0:
-        return IntensityMRLE(scale=a._scale)
+        return IndexedShapshot(scale=a._scale)
     if len(a.intensity_delta) == 0:
         intensity_delta = b.intensity_delta
     elif len(b.intensity_delta) == 0:
@@ -496,7 +496,7 @@ def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
     else:
         intensity_delta = np.concatenate((a.intensity_delta, b.intensity_delta))
 
-    time, intensity = _delta_to_mrle(intensity_delta[:, 0], intensity_delta[:, 1])
+    time, intensity = _delta_to_ishapshot(intensity_delta[:, 0], intensity_delta[:, 1])
     # The intensity at the end of the timeseries should be np.nan
     # But when we extract the intensity_delta, we replace it with 0 to make the calculation easier.
     # Other 0 value is included in the timeseries.
@@ -504,26 +504,26 @@ def _merge_mrle(a: IntensityMRLE, b: IntensityMRLE) -> IntensityMRLE:
     intensity[-1] = np.nan
 
     if len(time) == 0:
-        return IntensityMRLE(scale=a._scale)
+        return IndexedShapshot(scale=a._scale)
 
-    return IntensityMRLE(time, intensity, a._scale)
+    return IndexedShapshot(time, intensity, a._scale)
 
 
 @nb.njit
-def _mrle_total(
+def _ishapshot_total(
     time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 ) -> float:
     """
-    ### This is an internal function. Use `IntensityMRLE.mean()` instead.
+    ### This is an internal function. Use `IndexedShapshot.mean()` instead.
 
     Calculate the total depth of the intensity timeseries.
 
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
 
     Returns
     -------
@@ -539,20 +539,20 @@ def _mrle_total(
 
 
 @nb.njit
-def _mrle_mean(
+def _ishapshot_mean(
     time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 ) -> float:
     """
-    ### This is an internal function. Use `IntensityMRLE.mean()` instead.
+    ### This is an internal function. Use `IndexedShapshot.mean()` instead.
 
     Calculate the mean of the intensity timeseries.
 
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
 
     Returns
     -------
@@ -560,26 +560,26 @@ def _mrle_mean(
         The mean of the intensity timeseries.
 
     """
-    return _mrle_total(time, intensity) / (time[-1] - time[0])
+    return _ishapshot_total(time, intensity) / (time[-1] - time[0])
 
 
-@nb.njit
-def _mrle_sum_squared_error(
+@nb.njit    # type: ignore
+def _ishapshot_sum_squared_error(
     time: npt.NDArray[np.float64],
     intensity: npt.NDArray[np.float64],
     mean: Optional[float] = None,
 ) -> float:
     """
-    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+    ### This is an internal function. Use `IndexedShapshot.standard_deviation()` instead.
 
     Calculate the sum of squared error of the intensity timeseries.
 
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
     mean : float, optional
         The mean of the intensity timeseries, If None, it will be calculated, by default None
 
@@ -589,7 +589,7 @@ def _mrle_sum_squared_error(
         The sum of squared error of the intensity timeseries.
     """
     if mean is None:
-        mean = _mrle_mean(time, intensity)
+        mean = _ishapshot_mean(time, intensity)
     sse = 0
     for i in range(len(time) - 1):
         sse += (intensity[i] - mean) ** 2 * (time[i + 1] - time[i])
@@ -597,7 +597,7 @@ def _mrle_sum_squared_error(
 
 
 @nb.njit
-def _mrle_variance(
+def _ishapshot_variance(
     time: npt.NDArray[np.float64],
     intensity: npt.NDArray[np.float64],
     mean: Optional[float] = None,
@@ -605,16 +605,16 @@ def _mrle_variance(
     biased: Optional[bool] = False,
 ) -> float:
     """
-    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+    ### This is an internal function. Use `IndexedShapshot.standard_deviation()` instead.
 
     Calculate the variance of the intensity timeseries.
 
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
     mean : float, optional
         The mean of the intensity timeseries, If None, it will be calculated, by default None
     sse : float, optional
@@ -628,14 +628,14 @@ def _mrle_variance(
         The variance of the intensity timeseries.
     """
     if mean is None:
-        mean = _mrle_mean(time, intensity)
+        mean = _ishapshot_mean(time, intensity)
     if sse is None:
-        sse = _mrle_sum_squared_error(time, intensity, mean)
+        sse = _ishapshot_sum_squared_error(time, intensity, mean)
     return sse / (time[-1] - time[0] - (biased is False))
 
 
 @nb.njit
-def _mrle_standard_deviation(
+def _ishapshot_standard_deviation(
     time: npt.NDArray[np.float64],
     intensity: npt.NDArray[np.float64],
     mean: Optional[float] = None,
@@ -643,16 +643,16 @@ def _mrle_standard_deviation(
     biased: Optional[bool] = False,
 ) -> float:
     """
-    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+    ### This is an internal function. Use `IndexedShapshot.standard_deviation()` instead.
 
     Calculate the standard deviation of the intensity timeseries.
 
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
     mean : float, optional
         The mean of the intensity timeseries, If None, it will be calculated, by default None
     sse : float, optional
@@ -666,14 +666,14 @@ def _mrle_standard_deviation(
         The standard deviation of the intensity timeseries.
     """
     if mean is None:
-        mean = _mrle_mean(time, intensity)
+        mean = _ishapshot_mean(time, intensity)
     if sse is None:
-        sse = _mrle_sum_squared_error(time, intensity, mean)
-    return (_mrle_variance(time, intensity, mean, sse, biased)) ** 0.5
+        sse = _ishapshot_sum_squared_error(time, intensity, mean)
+    return (_ishapshot_variance(time, intensity, mean, sse, biased)) ** 0.5
 
 
 @nb.njit
-def _mrle_coef_var(
+def _ishapshot_coef_var(
     time: npt.NDArray[np.float64],
     intensity: npt.NDArray[np.float64],
     mean: Optional[float] = None,
@@ -681,16 +681,16 @@ def _mrle_coef_var(
     biased: Optional[bool] = False,
 ) -> float:
     """
-    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+    ### This is an internal function. Use `IndexedShapshot.standard_deviation()` instead.
 
     Calculate the coefficient of variation of the intensity timeseries.
 
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
     mean : float, optional
         The mean of the intensity timeseries, If None, it will be calculated, by default None
     sse : float, optional
@@ -706,22 +706,22 @@ def _mrle_coef_var(
     """
     # Coefficient of variation
     if mean is None:
-        mean = _mrle_mean(time, intensity)
+        mean = _ishapshot_mean(time, intensity)
 
     if mean == 0:
         return np.nan
 
     if sse is None:
-        sse = _mrle_sum_squared_error(time, intensity, mean)
+        sse = _ishapshot_sum_squared_error(time, intensity, mean)
 
     return (
-        _mrle_standard_deviation(time, intensity, mean=mean, sse=sse, biased=biased)
+        _ishapshot_standard_deviation(time, intensity, mean=mean, sse=sse, biased=biased)
         / mean
     )
 
 
 @nb.njit
-def _mrle_skew(
+def _ishapshot_skew(
     time: npt.NDArray[np.float64],
     intensity: npt.NDArray[np.float64],
     mean: Optional[float] = None,
@@ -729,7 +729,7 @@ def _mrle_skew(
     biased: Optional[bool] = False,
 ) -> float:
     """
-    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+    ### This is an internal function. Use `IndexedShapshot.standard_deviation()` instead.
 
     Calculate the skewness of the intensity timeseries.
     The standard deviation is calculated with the unbiased estimator.
@@ -737,9 +737,9 @@ def _mrle_skew(
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
     mean : float, optional
         The mean of the intensity timeseries, If None, it will be calculated, by default None
     sd : float, optional
@@ -756,10 +756,10 @@ def _mrle_skew(
     # Skewness
     n = time[-1] - time[0]
     if mean is None:
-        mean = _mrle_mean(time, intensity)
+        mean = _ishapshot_mean(time, intensity)
 
     if sd is None:
-        sd = _mrle_standard_deviation(time, intensity, mean, biased=False)
+        sd = _ishapshot_standard_deviation(time, intensity, mean, biased=False)
 
     if sd == 0:
         return np.nan
@@ -775,22 +775,22 @@ def _mrle_skew(
     return skewness
 
 
-def _mrle_pDry(
+def _ishapshot_pDry(
     time: npt.NDArray[np.float64],
     intensity: npt.NDArray[np.float64],
     threshold: float = 0,
 ) -> float:
     """
-    ### This is an internal function. Use `IntensityMRLE.pDry()` instead.
+    ### This is an internal function. Use `IndexedShapshot.pDry()` instead.
 
     Calculate the probability of dryness of the intensity timeseries with a threshold.
 
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
     threshold : float, optional
         The threshold of dryness, by default 0
 
@@ -807,7 +807,7 @@ def _mrle_pDry(
 
 
 @nb.njit
-def _mrle_acf(
+def _ishapshot_acf(
     time: npt.NDArray[np.float64],
     intensity: npt.NDArray[np.float64],
     lag: Optional[float] = 1,
@@ -815,7 +815,7 @@ def _mrle_acf(
     sse: Optional[float] = None,
 ):
     """
-    ### This is an internal function. Use `IntensityMRLE.acf()` instead.
+    ### This is an internal function. Use `IndexedShapshot.acf()` instead.
 
     Calculate the n-lag autocorrelation coefficient of the intensity timeseries.
     It's basically Cov(X_t, X_{t+lag}) / Var(X_t)
@@ -823,9 +823,9 @@ def _mrle_acf(
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
     lag : int, optional
         The lag of the autocorrelation coefficient, by default 1
     mean : float, optional
@@ -843,10 +843,10 @@ def _mrle_acf(
     n = len(time)
 
     if mean is None:
-        mean = _mrle_mean(time, intensity)
+        mean = _ishapshot_mean(time, intensity)
 
     if sse is None:
-        sse = _mrle_sum_squared_error(time, intensity, mean)
+        sse = _ishapshot_sum_squared_error(time, intensity, mean)
 
     if sse == 0:
         return np.nan
@@ -878,38 +878,38 @@ def _mrle_acf(
 
 
 @nb.njit()
-def _mrle_rescale(
+def _ishapshot_rescale(
     time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], scale: float
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
-    ### This is an internal function. Use `IntensityMRLE.standard_deviation()` instead.
+    ### This is an internal function. Use `IndexedShapshot.standard_deviation()` instead.
 
-    Rescale the MRLE timeseries to a different scale.
+    Rescale the IndexedShapshot timeseries to a different scale.
     New time index will be divided by the scale. And the intensity will be multiplied by the scale.
     All the time index will be divisible by the scale.
 
     Parameters
     ----------
     time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
     scale : float
         The scale to be rescaled to.
 
     Returns
     -------
     scaled time : npt.NDArray[np.float64]
-        1D array of time index that follows MRLE format.
+        1D array of time index that follows IndexedShapshot format.
     scaled intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows MRLE format.
+        1D array of intensity that follows IndexedShapshot format.
 
     Examples
     --------
     >>> time = np.array([0, 10, 13, 18, 33])
     >>> intensity = np.array([0, 3, 0, 5, np.nan])
     >>> scale = 5
-    >>> _mrle_rescale(time, intensity, scale)
+    >>> _ishapshot_rescale(time, intensity, scale)
     (array([0., 2., 3., 4., 6., 7.]), array([ 0.,  9., 10., 25., 15., nan]))
     """
     time_index = len(time) - 1

@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd  # type: ignore
 
-from pybl.timeseries import IntensityMRLE
+from pybl.timeseries import IndexedShapshot
 
 
 def get_month_intervals(
@@ -53,7 +53,7 @@ def to_year_month(
 ) -> npt.NDArray[np.float64]:
     """
     Convert input 1D array of unix time and intensity to 2D matrix of year and month.
-    With the shape of (nYear, 12). Each cell in the 2D matrix is a `IntensityMRLE` object of that month.
+    With the shape of (nYear, 12). Each cell in the 2D matrix is a `IndexedShapshot` object of that month.
 
     Parameters
     ----------
@@ -65,27 +65,27 @@ def to_year_month(
     Returns
     -------
     npt.NDArray
-        2D matrix of year and month full of `IntensityMRLE` objects.
+        2D matrix of year and month full of `IndexedShapshot` objects.
         With the shape of (nYear, 12).
     """
-    mrle = IntensityMRLE(unix_time, intensity / 3600)
+    series = IndexedShapshot(unix_time, intensity / 3600)
     # Gest starting year and ending year
     start_year = datetime.fromtimestamp(unix_time[0], tz=timezone.utc).year
     end_year = datetime.fromtimestamp(unix_time[-1], tz=timezone.utc).year
     month_interval_each_year = get_month_intervals(start=start_year, end=end_year)
-    mrleYearMonth = np.empty(
-        (len(month_interval_each_year), 12), dtype=IntensityMRLE
+    seriesYearMonth = np.empty(
+        (len(month_interval_each_year), 12), dtype=IndexedShapshot
     )  # (year, month)
     for i, year in enumerate(month_interval_each_year):
         for j, month in enumerate(year):
-            mrleYearMonth[i, j] = mrle[month[0] : month[1]]
+            seriesYearMonth[i, j] = series[month[0] : month[1]]
 
-    # Find the first row that doesn't have any IntensityMRLE object
-    for i, row in enumerate(mrleYearMonth):
+    # Find the first row that doesn't have any IndexedShapshot object
+    for i, row in enumerate(seriesYearMonth):
         if np.isnan(row[0].mean()):
             break
 
-    return mrleYearMonth
+    return seriesYearMonth
 
 
 def preprocess_classic(
@@ -118,34 +118,34 @@ def preprocess_classic(
     timescale = np.array(timescale)
     timescale = timescale * 3600  # Convert to second
 
-    mrle = IntensityMRLE(
+    series = IndexedShapshot(
         unix_time, intensity / 3600
     )  # Unit: mm/h so divide by 3600 to get mm/s
     month_interval_each_year = get_month_intervals()
-    # Segment the mrle timeseries into months from 1900 to 2100
-    mrle_month_each = np.empty(
-        (12, len(month_interval_each_year), len(timescale)), dtype=IntensityMRLE
+    # Segment the series timeseries into months from 1900 to 2100
+    series_month_each = np.empty(
+        (12, len(month_interval_each_year), len(timescale)), dtype=IndexedShapshot
     )  # (month, year, scale)
     for i, year in enumerate(month_interval_each_year):
         for j, month in enumerate(year):
             for k, scale in enumerate(timescale):
-                mrle_month_each[j, i, k] = mrle[month[0] : month[1]].rescale(scale)
+                series_month_each[j, i, k] = series[month[0] : month[1]].rescale(scale)
 
-    # MRLE that stores the total of each month
-    mrle_month_total = np.empty(
-        (12, len(timescale)), dtype=IntensityMRLE
+    # IndexedShapshot that stores the total of each month
+    series_month_total = np.empty(
+        (12, len(timescale)), dtype=IndexedShapshot
     )  # (month, scale)
     for i in range(12):
-        for j in range(len(mrle_month_each[0])):
+        for j in range(len(series_month_each[0])):
             for k, scale in enumerate(timescale):
                 if j == 0:
-                    mrle_month_total[i, k] = IntensityMRLE(scale=scale)
-                mrle_month_total[i, k].add(mrle_month_each[i, j, k], sequential=True)
+                    series_month_total[i, k] = IndexedShapshot(scale=scale)
+                series_month_total[i, k].add(series_month_each[i, j, k], sequential=True)
 
     stats_month = np.zeros((12, len(timescale), 5))  # (month, scale, stats)
     for month in range(12):
         for scale in range(len(timescale)):
-            model = mrle_month_total[month, scale]
+            model = series_month_total[month, scale]
             stats_month[month, scale, :] = [
                 model.mean(),
                 model.cvar(),
@@ -160,7 +160,7 @@ def preprocess_classic(
     for month in range(12):
         for year in range(len(month_interval_each_year)):
             for scale in range(len(timescale)):
-                model = mrle_month_each[month, year, scale]
+                model = series_month_each[month, year, scale]
                 stats_month_seperate[month, year, scale, :] = [
                     model.mean(),
                     model.cvar(),
