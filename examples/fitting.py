@@ -1,6 +1,5 @@
-from pybl.fitting import BLRPRxConfig
 from pybl.utils.timeseries import preprocess_classic
-from pybl.models import Stat_Props, BLRPRx_params, BLRPRx
+from pybl.models import Stat_Props, BLRPRx_params, BLRPRx, BLRPRxConfig
 import os
 import pandas as pd
 import numpy as np
