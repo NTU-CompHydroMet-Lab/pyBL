@@ -1,7 +1,11 @@
 version: 2
 
+formats:
+  - pdf
+  - htmlzip
+
 sphinx:
-  configuration: docs/conf.py
+  configuration: docs/source/conf.py
 
 build:
   os: ubuntu-22.04
@@ -9,7 +13,6 @@ build:
     python: "3.11"
 
 python:
-  version: 3.11
   install:
     - requirements: requirements.txt
     - requirements: requirements-dev.txt

@@ -1,6 +1,5 @@
-from pyBL.fitting import BLRPRxConfig
-from pyBL.utils.timeseries import preprocess_classic
-from pyBL.models import Stat_Props, BLRPRx_params, BLRPRx
+from pybl.utils.timeseries import preprocess_classic
+from pybl.models import Stat_Props, BLRPRx_params, BLRPRx, BLRPRxConfig
 import os
 import pandas as pd
 import numpy as np
@@ -11,6 +10,7 @@ timescale = np.array([1, 3, 6, 24])
 # Set timezone to UTC
 os.environ["TZ"] = "UTC"
 
+
 def rain_timeseries():
     data_path = os.path.join(os.path.dirname(__file__), "data", "elmdon.csv")
     data = pd.read_csv(data_path, parse_dates=["datatime"])
@@ -18,6 +18,7 @@ def rain_timeseries():
     time = data["datatime"].to_numpy()
     intensity = data["Elmdon"].to_numpy()
     return time, intensity
+
 
 time, intensity = rain_timeseries()
 
@@ -59,8 +60,10 @@ for month in range(12):
         print(model.get_prop(Stat_Props.CVAR, timescale=scale), end=" ")
         print(model.get_prop(Stat_Props.AR1, timescale=scale), end=" ")
         print(model.get_prop(Stat_Props.SKEWNESS, timescale=scale))
-    
-    result = sp.optimize.dual_annealing(obj, bounds=[(0.000001, 20)] * 7, maxiter=10000, x0=result.x)
+
+    result = sp.optimize.dual_annealing(
+        obj, bounds=[(0.000001, 20)] * 7, maxiter=10000, x0=result.x
+    )
     print(result)
     result_params = BLRPRx_params(*result.x)
     model = BLRPRx(result_params)
