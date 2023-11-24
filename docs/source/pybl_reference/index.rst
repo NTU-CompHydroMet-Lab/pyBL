@@ -1,10 +1,9 @@
-.. _pybl-reference:
-
 API Reference
 =============
 
-.. toctree:: 
+.. toctree::
     :maxdepth: 2
+    :hidden:
     :caption: API reference:
 
     pybl.models

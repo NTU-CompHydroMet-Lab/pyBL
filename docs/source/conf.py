@@ -13,23 +13,29 @@ sys.path.insert(0, os.path.abspath("../../pybl"))
 
 on_rtd = os.environ.get("READTHEDOCS") == "True"
 
-project = 'pyBL'
-copyright = '2023, KilinWei'
-author = 'KilinWei'
-release = '0.0.1'
+project = "pyBL"
+copyright = "2023, KilinWei"
+author = "KilinWei"
+release = "0.0.1"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["sphinx.ext.autodoc", "sphinx.ext.autosummary", "sphinx.ext.napoleon", "sphinx.ext.viewcode", "sphinx.ext.todo"]
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.todo",
+]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-master_doc = 'index'
+master_doc = "index"
 
-html_theme = 'furo'
-html_static_path = ['_static']
+html_theme = "furo"
+html_static_path = ["_static"]

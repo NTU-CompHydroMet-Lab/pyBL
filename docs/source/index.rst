@@ -3,7 +3,7 @@
 Welcome to pybBL's documentation!
 =================================
 
-pyBL is an open-source Python package for stochastic rainfall modelling based upon the randomised Bartlett-Lewis (BL) rectangular pulse model. 
+pyBL is an open-source Python package for stochastic rainfall modelling based upon the randomised Bartlett-Lewis (BL) rectangular pulse model.
 The BL model is a type of stochastic model that represents rainfall using a Poisson cluster point process.
 This package implements the most recent version of the BL model, based upon the state-of-the-art BL model developed in Onof and Wang (2020).
 
