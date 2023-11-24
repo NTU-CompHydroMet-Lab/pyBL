@@ -161,7 +161,10 @@ class IndexedShapshot:
     def __iadd__(self, timeseries: IndexedShapshot) -> IndexedShapshot:
         result_ishapshot = _merge_ishapshot(self, timeseries)
 
-        self._time, self._intensity = result_ishapshot._time, result_ishapshot._intensity
+        self._time, self._intensity = (
+            result_ishapshot._time,
+            result_ishapshot._intensity,
+        )
         self._intensity_delta = result_ishapshot._intensity_delta
 
         return self
@@ -333,7 +336,9 @@ class IndexedShapshot:
         """
         if self._time.size == 0:
             return type(self)(scale=self._scale * scale)
-        scale_time, scale_intensity = _ishapshot_rescale(self._time, self._intensity, scale)
+        scale_time, scale_intensity = _ishapshot_rescale(
+            self._time, self._intensity, scale
+        )
         return type(self)(scale_time, scale_intensity, self._scale * scale)
 
     def unpack(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
@@ -563,7 +568,7 @@ def _ishapshot_mean(
     return _ishapshot_total(time, intensity) / (time[-1] - time[0])
 
 
-@nb.njit    # type: ignore
+@nb.njit  # type: ignore
 def _ishapshot_sum_squared_error(
     time: npt.NDArray[np.float64],
     intensity: npt.NDArray[np.float64],
@@ -715,7 +720,9 @@ def _ishapshot_coef_var(
         sse = _ishapshot_sum_squared_error(time, intensity, mean)
 
     return (
-        _ishapshot_standard_deviation(time, intensity, mean=mean, sse=sse, biased=biased)
+        _ishapshot_standard_deviation(
+            time, intensity, mean=mean, sse=sse, biased=biased
+        )
         / mean
     )
 

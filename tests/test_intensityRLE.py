@@ -1,5 +1,4 @@
-from pybl.timeseries import IntensityMRLE
-from pybl.raincell.cell import ConstantCell
+from pybl.timeseries import IndexedShapshot
 import numpy as np
 import pytest
 
@@ -11,7 +10,7 @@ import pytest
     ],
 )
 def test_basic_instantiation(time, intensity, expected_time, expected_intensity):
-    rle = IntensityMRLE(time, intensity)
+    rle = IndexedShapshot(time, intensity)
     assert rle.time.tolist() == expected_time
     assert np.array_equal(rle.intensity.tolist(), expected_intensity, equal_nan=True)
 
@@ -39,21 +38,21 @@ def test_basic_instantiation(time, intensity, expected_time, expected_intensity)
 )
 def test_basic_instatiation_fail(time, intensity, error_msg):
     with pytest.raises(ValueError, match=error_msg):
-        IntensityMRLE(time, intensity)
+        IndexedShapshot(time, intensity)
 
 
 def test_mismatched_time_intensity():
     with pytest.raises(
         ValueError, match="time and intensity must have the same length"
     ):
-        IntensityMRLE([1, 2], [0, 1, 0])
+        IndexedShapshot([1, 2], [0, 1, 0])
 
 
 # def test_from_cells():
 #    # assuming Cell is another class you've defined
 #    cell1 = ConstantCell(5, 13, 7)
 #    cell2 = ConstantCell(8, 21, 3)
-#    rle = IntensityMRLE.fromCells([cell1, cell2])
+#    rle = IndexedShapshot.fromCells([cell1, cell2])
 #    assert rle.time.tolist() == [5, 8, 13, 21, 22]
 #    assert np.array_equal(rle.intensity.tolist(), [7, 10, 3, 0, np.nan], equal_nan=True)
 
@@ -99,7 +98,7 @@ def test_mismatched_time_intensity():
 #    ],
 # )
 # def test_operational_add(new_cell, expected_time, expected_intensity):
-#    rle = IntensityMRLE([10, 20, 30, 40], [5, 10, 15, 0])
+#    rle = IndexedShapshot([10, 20, 30, 40], [5, 10, 15, 0])
 #    """
 #    Testing different case when adding a cell to an RLE
 #    case1:
@@ -125,7 +124,7 @@ def test_mismatched_time_intensity():
 #    ],
 # )
 # def test_add(new_cell, times, intensities):
-#    rle = IntensityMRLE([10, 20, 30, 40], [5, 10, 15, 0])
+#    rle = IndexedShapshot([10, 20, 30, 40], [5, 10, 15, 0])
 
 #    rle.add(new_cell)
 #    for time, intensity in zip(times, intensities):

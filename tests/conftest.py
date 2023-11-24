@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import os
-from pybl.timeseries import IntensityMRLE
+from pybl.timeseries import IndexedShapshot
 
 
 @pytest.fixture(scope="session")

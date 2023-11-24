@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple, List
+from typing import Callable, List, Optional, Tuple
 
 import numba as nb  # type: ignore
 import numpy as np
-import pandas as pd
 import numpy.typing as npt
+import pandas as pd
 
 from pybl.models import BaseBLRP, BaseBLRP_RCIModel, Stat_Props
 from pybl.raincell import ExponentialRCIModel, IConstantRCI
@@ -211,7 +211,7 @@ class BLRPRx(BaseBLRP):
             axis=0,
         )
         return IndexedShapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
-    
+
 
 class BLRPRxConfig:
     __slots__ = ("_mask", "_weight", "_target", "_rci_model")
@@ -450,7 +450,6 @@ class BLRPRxConfig:
         )
         mask_df.index.name = "timescales"
         return mask_df
-
 
 
 @nb.njit()

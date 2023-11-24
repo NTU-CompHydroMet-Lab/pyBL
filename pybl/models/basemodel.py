@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Protocol, Type, Union
 
@@ -54,5 +52,3 @@ class BaseBLRP(Protocol):
             self.rci_model = rci_model
         else:
             raise TypeError("rci_model must be a implementation of IConstantRCI")
-
-
