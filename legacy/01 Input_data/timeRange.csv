@@ -1,4 +1,0 @@
-time,1h,3h,6h,1D
-timeForMean,1h,3h,6h,1D
-OutputTimeScaleForMean,1h
-prop,CV,AR-1,Skewness,pDry

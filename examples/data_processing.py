@@ -1,6 +1,6 @@
-from pyBL.timeseries import IntensityMRLE
-from pyBL.fitting import BLRPRxFitter
-from pyBL.models import BLRPRx, Stat_Props, BLRPRx_params
+from pybl.timeseries import IntensityMRLE
+from pybl.fitting import BLRPRxFitter
+from pybl.models import BLRPRx, Stat_Props, BLRPRx_params
 import os
 import pandas as pd
 import numpy as np
@@ -8,6 +8,7 @@ import numpy as np
 timescale = [3600, 3 * 3600, 6 * 3600, 24 * 3600]
 # Set timezone to UTC
 os.environ["TZ"] = "UTC"
+
 
 def rain_timeseries():
     data_path = os.path.join(os.path.dirname(__file__), "data", "elmdon.csv")
@@ -30,8 +31,9 @@ def month_start_end():
     month_interval = np.reshape(month_interval, (-1, 12, 2))
     return month_interval
 
+
 time, intensity = rain_timeseries()
-mrle = IntensityMRLE(time, intensity) # Unit: mm/h so divide by 3600 to get mm/s
+mrle = IntensityMRLE(time, intensity)  # Unit: mm/h so divide by 3600 to get mm/s
 month_interval_each_year = month_start_end()
 
 # Segment the mrle timeseries into months from 1900 to 2100
@@ -41,9 +43,7 @@ mrle_month_each = np.empty(
 for i, year in enumerate(month_interval_each_year):
     for j, month in enumerate(year):
         for k, scale in enumerate(timescale):
-            mrle_month_each[j, i, k] = mrle[month[0] : month[1]].rescale(
-                scale
-            )
+            mrle_month_each[j, i, k] = mrle[month[0] : month[1]].rescale(scale)
 
 # MRLE that stores the total of each month
 mrle_month_total = np.empty((12, len(timescale)), dtype=IntensityMRLE)  # (month, scale)
@@ -81,9 +81,7 @@ for month in range(12):
                 model.pDry(0),
             ]
 
-stats_weight = 1 / np.nanvar(
-    stats_month_seperate, axis=1
-)  # (month, scale, stats)
+stats_weight = 1 / np.nanvar(stats_month_seperate, axis=1)  # (month, scale, stats)
 
 target = stats_month
 weight = stats_weight
