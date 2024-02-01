@@ -2,19 +2,6 @@ from pybl.timeseries import IndexedShapshot
 import numpy as np
 import pytest
 
-
-@pytest.mark.parametrize(
-    "time, intensity, expected_time, expected_intensity",
-    [
-        ([1, 2, 3], [0, 1, 0], [1.0, 2.0, 3.0, 4.0], [0.0, 1.0, 0.0, np.nan]),
-    ],
-)
-def test_basic_instantiation(time, intensity, expected_time, expected_intensity):
-    rle = IndexedShapshot(time, intensity)
-    assert rle.time.tolist() == expected_time
-    assert np.array_equal(rle.intensity.tolist(), expected_intensity, equal_nan=True)
-
-
 @pytest.mark.parametrize(
     "time, intensity, error_msg",
     [
@@ -47,6 +34,34 @@ def test_mismatched_time_intensity():
     ):
         IndexedShapshot([1, 2], [0, 1, 0])
 
+@pytest.mark.parametrize(
+    "time, intensity, expected_time, expected_intensity",
+    [
+        ([-10, 0, 10, 20], [1, 2, 3, 4], [-10, 0, 10, 20, 21], [1, 2, 3, 4, np.nan]),
+        ([-10, 0, 10, 20], [1, 2, 2, 4], [-10, 0, 20, 21], [1, 2, 4, np.nan]),
+        ([-10, 0, 10, 20], [1, 2, 3, 3], [-10, 0, 10, 21], [1, 2, 3, np.nan]),
+        ([-10, 0, 10, 20], [1, 2, 2, 2], [-10, 0, 21], [1, 2, np.nan]),
+        ([-10, 0, 10, 20], [1, 1, 1, 1], [-10, 21], [1, np.nan]),
+        ([-10, 0, 10, 20], [1, 1, 1, 0], [-10, 20, 21], [1, 0, np.nan]),
+        ([-10, 0, 10, 20], [1, 2, 3, np.nan], [-10, 0, 10, 20], [1, 2, 3, np.nan]),
+        ([-10, 0, 10, 20], [1, 2, np.nan, np.nan], [-10, 0, 10], [1, 2, np.nan]),
+    ]
+)
+def test_basic_instantiation(time, intensity, expected_time, expected_intensity):
+    ist = IndexedShapshot(time, intensity)
+    assert np.array_equal(ist.time, np.array(expected_time))
+    assert np.array_equal(ist.intensity, expected_intensity, equal_nan=True)
+    
+@pytest.mark.parametrize(
+    "time, intensity, expected_time, expected_intensity",
+    [
+        ([0.123, 0.456, 0.789], [0.789, 0.456, 0.123], [0.123, 0.456, 0.789, 1.789], [0.789, 0.456, 0.123, np.nan]),
+    ]
+)
+def test_float_instantiation(time, intensity, expected_time, expected_intensity):
+    ist = IndexedShapshot(time, intensity)
+    assert np.allclose(ist.time, expected_time)
+    assert np.allclose(ist.intensity, expected_intensity, equal_nan=True)
 
 # def test_from_cells():
 #    # assuming Cell is another class you've defined

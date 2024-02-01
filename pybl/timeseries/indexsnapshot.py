@@ -15,7 +15,7 @@ import numpy.typing as npt
 __all__ = ["IndexedShapshot"]
 
 FloatArray = Optional[
-    Union[npt.NDArray[np.float64], npt.NDArray[np.int64], List[float]]
+    Union[npt.NDArray[np.float64], List[float]]
 ]
 
 
@@ -208,9 +208,9 @@ class IndexedShapshot:
 
         if start_idx != 0:
             time[0] = time_idx.start
-        if stop_idx < len(self._time) and time[-1] != time_idx.stop - 1:
-            time = np.append(time, time_idx.stop - 1)
-            intensity = np.append(intensity, intensity[-1])
+        if stop_idx < len(self._time):
+            time = np.append(time, time_idx.stop)
+            intensity = np.append(intensity, np.nan)
 
         return type(self)(time, intensity, self._scale)
 
@@ -372,6 +372,7 @@ def _ishapshot_check(
         _intensity: npt.NDArray[np.float64] = np.array([], dtype=np.float64)
 
         return _time, _intensity
+
     time = np.array(time, dtype=np.float64)
     intensity = np.array(intensity, dtype=np.float64)
 
@@ -382,12 +383,23 @@ def _ishapshot_check(
     if time.ndim != 1 or intensity.ndim != 1:
         raise ValueError("time and intensity must be 1D arrays")
     # Check if the RLE time is strictly increasing.
-    if np.any(np.diff(time) < 0):
+    if np.any(np.diff(time) <= 0):
         raise ValueError("time must be strictly increasing")
+    # Check if there are any nan in the time
+    if np.any(np.isnan(time)):
+        raise ValueError("time must not contain any nan")
     # Add ending time and intensity if there isn't one
     if not np.isnan(intensity[-1]):
         time = np.append(time, time[-1] + 1)
         intensity = np.append(intensity, np.nan)
+    # Check if all np.nan are at the end of the intensity timeseries
+    if (num_of_nan := np.sum(np.isnan(intensity))) >= 1:
+        if not np.all(np.isnan(intensity[-num_of_nan:])):
+            raise ValueError("All np.nan must be at the end of the intensity timeseries")
+    
+    if num_of_nan > 1:
+        time = time[:-num_of_nan+1]
+        intensity = intensity[:-num_of_nan+1]
 
     # Make sure it's in IndexedShapshot format
     intensity_idx = np.diff(intensity, prepend=-np.inf) != 0
