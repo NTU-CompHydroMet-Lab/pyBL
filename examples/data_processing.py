@@ -1,11 +1,10 @@
-from pybl.timeseries import IntensityMRLE
-from pybl.fitting import BLRPRxFitter
+from pybl.timeseries import IndexedShapshot
 from pybl.models import BLRPRx, Stat_Props, BLRPRx_params
 import os
 import pandas as pd
 import numpy as np
 
-timescale = [3600, 3 * 3600, 6 * 3600, 24 * 3600]
+timescale = [1, 3, 6, 24]
 # Set timezone to UTC
 os.environ["TZ"] = "UTC"
 
@@ -33,12 +32,12 @@ def month_start_end():
 
 
 time, intensity = rain_timeseries()
-mrle = IntensityMRLE(time, intensity)  # Unit: mm/h so divide by 3600 to get mm/s
+mrle = IndexedShapshot(time, intensity)  # Unit: mm/h so divide by 3600 to get mm/s
 month_interval_each_year = month_start_end()
 
 # Segment the mrle timeseries into months from 1900 to 2100
 mrle_month_each = np.empty(
-    (12, len(month_interval_each_year), len(timescale)), dtype=IntensityMRLE
+    (12, len(month_interval_each_year), len(timescale)), dtype=IndexedShapshot
 )  # (month, year, scale)
 for i, year in enumerate(month_interval_each_year):
     for j, month in enumerate(year):
@@ -46,12 +45,12 @@ for i, year in enumerate(month_interval_each_year):
             mrle_month_each[j, i, k] = mrle[month[0] : month[1]].rescale(scale)
 
 # MRLE that stores the total of each month
-mrle_month_total = np.empty((12, len(timescale)), dtype=IntensityMRLE)  # (month, scale)
+mrle_month_total = np.empty((12, len(timescale)), dtype=IndexedShapshot)  # (month, scale)
 for i in range(12):
     for j in range(len(mrle_month_each[0])):
         for k, scale in enumerate(timescale):
             if j == 0:
-                mrle_month_total[i, k] = IntensityMRLE(scale=scale)
+                mrle_month_total[i, k] = IndexedShapshot(scale=scale)
             mrle_month_total[i, k].add(mrle_month_each[i, j, k], sequential=True)
 
 stats_month = np.zeros((12, len(timescale), 5))  # (month, scale, stats)
@@ -82,6 +81,8 @@ for month in range(12):
             ]
 
 stats_weight = 1 / np.nanvar(stats_month_seperate, axis=1)  # (month, scale, stats)
-
 target = stats_month
 weight = stats_weight
+
+print(target[0])
+print(weight[0])

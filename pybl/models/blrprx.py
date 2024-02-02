@@ -210,7 +210,9 @@ class BLRPRx(BaseBLRP):
             ],
             axis=0,
         )
-        return IndexedShapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
+        ts = IndexedShapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
+
+        return ts[0: duration_hr]   # type: ignore
 
 
 class BLRPRxConfig:
