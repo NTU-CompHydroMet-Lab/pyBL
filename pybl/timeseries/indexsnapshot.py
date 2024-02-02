@@ -396,7 +396,7 @@ def _ishapshot_check(
     if (num_of_nan := np.sum(np.isnan(intensity))) >= 1:
         if not np.all(np.isnan(intensity[-num_of_nan:])):
             raise ValueError("All np.nan must be at the end of the intensity timeseries")
-    
+
     if num_of_nan > 1:
         time = time[:-num_of_nan+1]
         intensity = intensity[:-num_of_nan+1]
