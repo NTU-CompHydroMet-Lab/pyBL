@@ -37,13 +37,12 @@ class IndexedShapshot:
         [(0, 0), (3, 1), (5, 0)]
     """
 
-    __slots__ = ("_time", "_intensity", "_intensity_delta", "_scale")
+    __slots__ = ("_time", "_intensity", "_intensity_delta")
 
     def __init__(
         self,
         time: FloatArray = None,
         intensity: FloatArray = None,
-        scale: float = 1,
     ):
         """
         Parameters
@@ -61,11 +60,10 @@ class IndexedShapshot:
             )
         else:
             self._intensity_delta = np.array([], dtype=np.float64)
-        self._scale = scale
 
     @classmethod
     def fromDelta(
-        cls, time: FloatArray, intensity_delta: FloatArray, scale: int = 1
+        cls, time: FloatArray, intensity_delta: FloatArray
     ) -> IndexedShapshot:
         """
         Create an IndexedShapshot timeseries from the delta encoded intensity timeseries.
@@ -92,7 +90,7 @@ class IndexedShapshot:
 
         time, intensity_ishapshot = _delta_to_ishapshot(time, intensity_delta)
 
-        return cls(time, intensity_ishapshot, scale)
+        return cls(time, intensity_ishapshot)
 
     @property
     def time(self) -> npt.NDArray[np.float64]:
@@ -154,7 +152,6 @@ class IndexedShapshot:
                 timeseries = IndexedShapshot(
                     timeseries.time - (timeseries.time[0] - self._time[-1]),
                     timeseries.intensity,
-                    timeseries._scale,
                 )
         self.__iadd__(timeseries)
 
@@ -193,15 +190,15 @@ class IndexedShapshot:
         ### This is an internal function. You shouldn't use it directly unless you know what you are doing.
         """
         if time_idx.start >= time_idx.stop:
-            return type(self)(scale=self._scale)
+            return type(self)()
         # Use binary search to find the index
         start_idx = np.searchsorted(a=self._time, v=time_idx.start, side="right")
         stop_idx = np.searchsorted(a=self._time, v=time_idx.stop, side="left")
 
         if start_idx == len(self._time):
-            return type(self)(scale=self._scale)
+            return type(self)()
         if stop_idx == 0:
-            return type(self)(scale=self._scale)
+            return type(self)()
 
         time = self._time[max(0, start_idx - 1) : stop_idx]
         intensity = self._intensity[max(0, start_idx - 1) : stop_idx]
@@ -212,7 +209,7 @@ class IndexedShapshot:
             time = np.append(time, time_idx.stop)
             intensity = np.append(intensity, np.nan)
 
-        return type(self)(time, intensity, self._scale)
+        return type(self)(time, intensity)
 
     def _get_int_idx(self, time_idx: int) -> np.float64:
         """
@@ -335,11 +332,11 @@ class IndexedShapshot:
         All the time index will be divisible by the scale.
         """
         if self._time.size == 0:
-            return type(self)(scale=self._scale * scale)
+            return type(self)()
         scale_time, scale_intensity = _ishapshot_rescale(
             self._time, self._intensity, scale
         )
-        return type(self)(scale_time, scale_intensity, self._scale * scale)
+        return type(self)(scale_time, scale_intensity)
 
     def unpack(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """
@@ -500,12 +497,8 @@ def _merge_ishapshot(a: IndexedShapshot, b: IndexedShapshot) -> IndexedShapshot:
     IndexedShapshot
         The merged IndexedShapshot timeseries.
     """
-    if a._scale != b._scale:
-        raise ValueError(
-            "Merging two timeseries with different scale is not supported '''YET'''."
-        )
     if len(a.intensity_delta) == 0 and len(b.intensity_delta) == 0:
-        return IndexedShapshot(scale=a._scale)
+        return IndexedShapshot()
     if len(a.intensity_delta) == 0:
         intensity_delta = b.intensity_delta
     elif len(b.intensity_delta) == 0:
@@ -521,9 +514,9 @@ def _merge_ishapshot(a: IndexedShapshot, b: IndexedShapshot) -> IndexedShapshot:
     intensity[-1] = np.nan
 
     if len(time) == 0:
-        return IndexedShapshot(scale=a._scale)
+        return IndexedShapshot()
 
-    return IndexedShapshot(time, intensity, a._scale)
+    return IndexedShapshot(time, intensity)
 
 
 @nb.njit

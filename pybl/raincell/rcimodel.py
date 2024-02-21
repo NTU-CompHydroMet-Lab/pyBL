@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 import numba as nb  # type: ignore
 import numpy as np
@@ -23,7 +23,7 @@ class IConstantRCI(Protocol):
         rng: np.random.Generator,
         mux: float,
         sigmax_mux: float,
-        n_cells: Optional[int] = None,
+        n_cells: int,
     ) -> npt.NDArray[np.float64]:
         ...
 
@@ -139,7 +139,7 @@ class GPRCIModel(IConstantRCI):
     @nb.njit
     def sample_intensity(
         rng: np.random.Generator, mux: float, sigmax_mux: float, n_cells: int = 1
-    ) -> float:
+    ) -> npt.NDArray[np.float64]:
         I_scale = mux * (1.0 - sigmax_mux)
         I_location = 0.0
 
