@@ -7,7 +7,7 @@ from typing import Callable, List, Optional, Tuple
 import numba as nb  # type: ignore
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from pybl.models import BaseBLRP, BaseBLRP_RCIModel, Stat_Props
 from pybl.raincell import ExponentialRCIModel, IConstantRCI
