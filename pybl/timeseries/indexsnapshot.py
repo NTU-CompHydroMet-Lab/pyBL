@@ -223,7 +223,7 @@ class IndexedShapshot:
 
     def __str__(self) -> str:
         time_value = "\n".join(
-            f"{self.time[i]:>5.7f} {self.intensity[i]:>5.7f}"
+            f"{self.time[i]} {self.intensity[i]}"
             for i in range(len(self.time))
         )
         return time_value
@@ -468,6 +468,8 @@ def _delta_to_ishapshot(
     # Calculate the cumulative sum of the intensity changes inplace.
     for i in range(1, len(intensity_delta)):
         intensity_delta[i] += intensity_delta[i - 1]
+
+    intensity_delta[np.where(np.abs(intensity_delta) < 1e-10)] = 0
 
     # Remove duplicate times by keeping the last occurence
     diff_idx = np.empty(len(time), dtype=np.bool_)

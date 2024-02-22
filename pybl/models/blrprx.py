@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, overload
 
 import numba as nb  # type: ignore
 import numpy as np
@@ -10,7 +10,7 @@ import numpy.typing as npt
 import pandas as pd  # type: ignore
 
 from pybl.models import BaseBLRP, BaseBLRP_RCIModel, Stat_Props
-from pybl.raincell import ExponentialRCIModel, IConstantRCI
+from pybl.raincell import ExponentialRCIModel, IConstantRCI, Storm
 from pybl.timeseries import IndexedShapshot
 
 
@@ -197,12 +197,13 @@ class BLRPRx(BaseBLRP):
 
     def sample(self, duration_hr: float) -> IndexedShapshot:
         # cell_arr = self.sample_raw(duration_hr)
-        cell_arr = _blrprx_sample(
+        cell_arr, n_cells_per_storm, storms_info = _blrprx_sample(
             duration_hr,
             self.rci_model.sample_intensity,
             self.rng,
             *self.get_params().unpack(),
         )
+
         delta = np.concatenate(
             [
                 np.stack([cell_arr[:, 0], cell_arr[:, 2]]).T,
@@ -212,7 +213,41 @@ class BLRPRx(BaseBLRP):
         )
         ts = IndexedShapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
 
-        return ts[0: duration_hr]   # type: ignore
+        return ts[0: duration_hr]
+
+    def sample_storms(self, duration_hr: float) -> Tuple[IndexedShapshot, List[Storm]]:
+        cell_arr, n_cells_per_storm, storms_info = _blrprx_sample(
+            duration_hr,
+            self.rci_model.sample_intensity,
+            self.rng,
+            *self.get_params().unpack(),
+        )
+
+        delta = np.concatenate(
+            [
+                np.stack([cell_arr[:, 0], cell_arr[:, 2]]).T,
+                np.stack([cell_arr[:, 1], -cell_arr[:, 2]]).T,
+            ],
+            axis=0,
+        )
+        ts = IndexedShapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
+
+        storms = []
+
+        cum_cells = 0
+        for i, storm_info in enumerate(storms_info):
+            storms.append(Storm(
+                cells=cell_arr[cum_cells : cum_cells + n_cells_per_storm[i]],
+                start=storm_info[0],
+                duration=storm_info[1],
+                eta=storm_info[2],
+                mux=storm_info[3],
+                gamma=storm_info[4],
+                beta=storm_info[5],
+            ))
+            cum_cells += n_cells_per_storm[i]
+
+        return ts[0: duration_hr], storms
 
 
 class BLRPRxConfig:
@@ -705,7 +740,7 @@ def _blrprx_sample(
     nu: float,
     sigmax_mux: float,
     iota: float,
-) -> npt.NDArray[np.float64]:
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
     # Storm number sampling
     n_storm = rng.poisson(lambda_ * duration_hr)
 
@@ -714,6 +749,7 @@ def _blrprx_sample(
     mux = np.empty(n_storm, dtype=np.float64)
     storm_starts = np.empty(n_storm, dtype=np.float64)
     storm_durations = np.empty(n_storm, dtype=np.float64)
+    storm_info = np.empty((n_storm, 6), dtype=np.float64)
     n_cells_per_storm = np.empty(n_storm, dtype=np.int64)
     for i in range(n_storm):
         eta[i] = rng.gamma(alpha, 1 / nu)
@@ -730,6 +766,7 @@ def _blrprx_sample(
             beta * storm_durations[i]
         )  # n_cells_per_storm = 1 + rng.poisson(beta * storm_durations, size=n_storm)
         total_cells += n_cells_per_storm[i]
+        storm_info[i] = (storm_starts[i], storm_durations[i], eta[i], mux[i], gamma, beta)
 
     # Pre-allocate arrays
     cell_starts = np.empty(total_cells)  # (total_cells, )
@@ -761,4 +798,4 @@ def _blrprx_sample(
         (cell_starts, cell_ends, cell_intensities), axis=-1
     )  # (total_cells, 3)
 
-    return cell_arr
+    return cell_arr, n_cells_per_storm, storm_info
