@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-
 import numpy as np
 import numpy.typing as npt
-import numba as nb
+
 
 class Storm:
     def __init__(self, start: float, duration: float, cells: npt.NDArray[np.float64], eta: float, mux: float, gamma: float, beta: float):

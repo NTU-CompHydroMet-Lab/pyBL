@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple, overload
+from typing import Callable, List, Optional, Tuple
 
 import numba as nb  # type: ignore
 import numpy as np
@@ -213,7 +213,7 @@ class BLRPRx(BaseBLRP):
         )
         ts = IndexedShapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
 
-        return ts[0: duration_hr]
+        return ts[0: duration_hr]   # type: ignore
 
     def sample_storms(self, duration_hr: float) -> Tuple[IndexedShapshot, List[Storm]]:
         cell_arr, n_cells_per_storm, storms_info = _blrprx_sample(
@@ -247,7 +247,7 @@ class BLRPRx(BaseBLRP):
             ))
             cum_cells += n_cells_per_storm[i]
 
-        return ts[0: duration_hr], storms
+        return ts[0: duration_hr], storms   # type: ignore
 
 
 class BLRPRxConfig:

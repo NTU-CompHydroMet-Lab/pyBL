@@ -139,7 +139,7 @@ def preprocess_classic(
         for j in range(len(series_month_each[0])):
             for k, scale in enumerate(timescale):
                 if j == 0:
-                    series_month_total[i, k] = IndexedShapshot(scale=scale)
+                    series_month_total[i, k] = IndexedShapshot()
                 series_month_total[i, k].add(
                     series_month_each[i, j, k], sequential=True
                 )
