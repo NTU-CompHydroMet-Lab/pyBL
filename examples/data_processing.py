@@ -1,4 +1,4 @@
-from pybl.timeseries import IndexedShapshot
+from pybl.timeseries import IndexedSnapshot
 from pybl.models import BLRPRx, Stat_Props, BLRPRx_params
 import os
 import pandas as pd
@@ -32,12 +32,12 @@ def month_start_end():
 
 
 time, intensity = rain_timeseries()
-mrle = IndexedShapshot(time, intensity)  # Unit: mm/h so divide by 3600 to get mm/s
+mrle = IndexedSnapshot(time, intensity)  # Unit: mm/h so divide by 3600 to get mm/s
 month_interval_each_year = month_start_end()
 
 # Segment the mrle timeseries into months from 1900 to 2100
 mrle_month_each = np.empty(
-    (12, len(month_interval_each_year), len(timescale)), dtype=IndexedShapshot
+    (12, len(month_interval_each_year), len(timescale)), dtype=IndexedSnapshot
 )  # (month, year, scale)
 for i, year in enumerate(month_interval_each_year):
     for j, month in enumerate(year):
@@ -45,12 +45,14 @@ for i, year in enumerate(month_interval_each_year):
             mrle_month_each[j, i, k] = mrle[month[0] : month[1]].rescale(scale)
 
 # MRLE that stores the total of each month
-mrle_month_total = np.empty((12, len(timescale)), dtype=IndexedShapshot)  # (month, scale)
+mrle_month_total = np.empty(
+    (12, len(timescale)), dtype=IndexedSnapshot
+)  # (month, scale)
 for i in range(12):
     for j in range(len(mrle_month_each[0])):
         for k, scale in enumerate(timescale):
             if j == 0:
-                mrle_month_total[i, k] = IndexedShapshot(scale=scale)
+                mrle_month_total[i, k] = IndexedSnapshot(scale=scale)
             mrle_month_total[i, k].add(mrle_month_each[i, j, k], sequential=True)
 
 stats_month = np.zeros((12, len(timescale), 5))  # (month, scale, stats)

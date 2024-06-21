@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd  # type: ignore
 
-from pybl.timeseries import IndexedShapshot
+from pybl.timeseries import IndexedSnapshot
 
 
 def get_month_intervals(
@@ -53,7 +53,7 @@ def to_year_month(
 ) -> npt.NDArray[np.float64]:
     """
     Convert input 1D array of unix time and intensity to 2D matrix of year and month.
-    With the shape of (nYear, 12). Each cell in the 2D matrix is a `IndexedShapshot` object of that month.
+    With the shape of (nYear, 12). Each cell in the 2D matrix is a `IndexedSnapshot` object of that month.
 
     Parameters
     ----------
@@ -65,22 +65,22 @@ def to_year_month(
     Returns
     -------
     npt.NDArray
-        2D matrix of year and month full of `IndexedShapshot` objects.
+        2D matrix of year and month full of `IndexedSnapshot` objects.
         With the shape of (nYear, 12).
     """
-    series = IndexedShapshot(unix_time, intensity / 3600)
+    series = IndexedSnapshot(unix_time, intensity / 3600)
     # Gest starting year and ending year
     start_year = datetime.fromtimestamp(unix_time[0], tz=timezone.utc).year
     end_year = datetime.fromtimestamp(unix_time[-1], tz=timezone.utc).year
     month_interval_each_year = get_month_intervals(start=start_year, end=end_year)
     seriesYearMonth = np.empty(
-        (len(month_interval_each_year), 12), dtype=IndexedShapshot
+        (len(month_interval_each_year), 12), dtype=IndexedSnapshot
     )  # (year, month)
     for i, year in enumerate(month_interval_each_year):
         for j, month in enumerate(year):
             seriesYearMonth[i, j] = series[month[0] : month[1]]
 
-    # Find the first row that doesn't have any IndexedShapshot object
+    # Find the first row that doesn't have any IndexedSnapshot object
     for i, row in enumerate(seriesYearMonth):
         if np.isnan(row[0].mean()):
             break
@@ -116,30 +116,29 @@ def preprocess_classic(
         3D matrix of weight. With the shape of (12 (month), nScale, nStats).
     """
     timescale = np.array(timescale)
-    timescale = timescale * 3600  # Convert to second
 
-    series = IndexedShapshot(
-        unix_time, intensity / 3600
+    series = IndexedSnapshot(
+        unix_time, intensity
     )  # Unit: mm/h so divide by 3600 to get mm/s
     month_interval_each_year = get_month_intervals()
     # Segment the series timeseries into months from 1900 to 2100
     series_month_each = np.empty(
-        (12, len(month_interval_each_year), len(timescale)), dtype=IndexedShapshot
+        (12, len(month_interval_each_year), len(timescale)), dtype=IndexedSnapshot
     )  # (month, year, scale)
     for i, year in enumerate(month_interval_each_year):
         for j, month in enumerate(year):
             for k, scale in enumerate(timescale):
                 series_month_each[j, i, k] = series[month[0] : month[1]].rescale(scale)
 
-    # IndexedShapshot that stores the total of each month
+    # IndexedSnapshot that stores the total of each month
     series_month_total = np.empty(
-        (12, len(timescale)), dtype=IndexedShapshot
+        (12, len(timescale)), dtype=IndexedSnapshot
     )  # (month, scale)
     for i in range(12):
         for j in range(len(series_month_each[0])):
             for k, scale in enumerate(timescale):
                 if j == 0:
-                    series_month_total[i, k] = IndexedShapshot()
+                    series_month_total[i, k] = IndexedSnapshot()
                 series_month_total[i, k].add(
                     series_month_each[i, j, k], sequential=True
                 )
@@ -150,8 +149,8 @@ def preprocess_classic(
             model = series_month_total[month, scale]
             stats_month[month, scale, :] = [
                 model.mean(),
-                model.cvar(),
-                model.acf(1),
+                model.coef_variation(),
+                model.autocorr_coef(1),
                 model.skewness(),
                 model.pDry(0),
             ]
@@ -165,8 +164,8 @@ def preprocess_classic(
                 model = series_month_each[month, year, scale]
                 stats_month_seperate[month, year, scale, :] = [
                     model.mean(),
-                    model.cvar(),
-                    model.acf(1),
+                    model.coef_variation(),
+                    model.autocorr_coef(1),
                     model.skewness(),
                     model.pDry(0),
                 ]

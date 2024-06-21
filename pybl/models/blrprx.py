@@ -11,7 +11,7 @@ import pandas as pd  # type: ignore
 
 from pybl.models import BaseBLRP, BaseBLRP_RCIModel, Stat_Props
 from pybl.raincell import ExponentialRCIModel, IConstantRCI, Storm
-from pybl.timeseries import IndexedShapshot
+from pybl.timeseries import IndexedSnapshot
 
 
 @dataclass
@@ -30,7 +30,15 @@ class BLRPRx_params:
 
     def unpack(
         self,
-    ) -> Tuple[float, float, float, float, float, float, float,]:
+    ) -> Tuple[
+        float,
+        float,
+        float,
+        float,
+        float,
+        float,
+        float,
+    ]:
         return (
             self.lambda_,
             self.phi,
@@ -168,16 +176,16 @@ class BLRPRx(BaseBLRP):
 
         cells_start_idx = 0
         for i, (s, d) in enumerate(zip(storm_starts, storm_durations)):
-            cell_starts[
-                cells_start_idx
-            ] = s  # First cell starts at the same time as the storm
+            cell_starts[cells_start_idx] = (
+                s  # First cell starts at the same time as the storm
+            )
             cell_starts[
                 cells_start_idx + 1 : cells_start_idx + n_cells_per_storm[i]
             ] = rng.uniform(s, s + d, n_cells_per_storm[i] - 1)
 
-            cell_durations[
-                cells_start_idx : cells_start_idx + n_cells_per_storm[i]
-            ] = rng.exponential(scale=1 / eta[i], size=n_cells_per_storm[i])
+            cell_durations[cells_start_idx : cells_start_idx + n_cells_per_storm[i]] = (
+                rng.exponential(scale=1 / eta[i], size=n_cells_per_storm[i])
+            )
 
             cell_intensities[
                 cells_start_idx : cells_start_idx + n_cells_per_storm[i]
@@ -195,7 +203,7 @@ class BLRPRx(BaseBLRP):
 
         return cell_arr
 
-    def sample(self, duration_hr: float) -> IndexedShapshot:
+    def sample(self, duration_hr: float) -> IndexedSnapshot:
         # cell_arr = self.sample_raw(duration_hr)
         cell_arr, n_cells_per_storm, storms_info = _blrprx_sample(
             duration_hr,
@@ -211,11 +219,11 @@ class BLRPRx(BaseBLRP):
             ],
             axis=0,
         )
-        ts = IndexedShapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
+        ts = IndexedSnapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
 
-        return ts[0: duration_hr]   # type: ignore
+        return ts[0:duration_hr]  # type: ignore
 
-    def sample_storms(self, duration_hr: float) -> Tuple[IndexedShapshot, List[Storm]]:
+    def sample_storms(self, duration_hr: float) -> Tuple[IndexedSnapshot, List[Storm]]:
         cell_arr, n_cells_per_storm, storms_info = _blrprx_sample(
             duration_hr,
             self.rci_model.sample_intensity,
@@ -230,24 +238,26 @@ class BLRPRx(BaseBLRP):
             ],
             axis=0,
         )
-        ts = IndexedShapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
+        ts = IndexedSnapshot.fromDelta(time=delta[:, 0], intensity_delta=delta[:, 1])
 
         storms = []
 
         cum_cells = 0
         for i, storm_info in enumerate(storms_info):
-            storms.append(Storm(
-                cells=cell_arr[cum_cells : cum_cells + n_cells_per_storm[i]],
-                start=storm_info[0],
-                duration=storm_info[1],
-                eta=storm_info[2],
-                mux=storm_info[3],
-                gamma=storm_info[4],
-                beta=storm_info[5],
-            ))
+            storms.append(
+                Storm(
+                    cells=cell_arr[cum_cells : cum_cells + n_cells_per_storm[i]],
+                    start=storm_info[0],
+                    duration=storm_info[1],
+                    eta=storm_info[2],
+                    mux=storm_info[3],
+                    gamma=storm_info[4],
+                    beta=storm_info[5],
+                )
+            )
             cum_cells += n_cells_per_storm[i]
 
-        return ts[0: duration_hr], storms   # type: ignore
+        return ts[0:duration_hr], storms  # type: ignore
 
 
 class BLRPRxConfig:
@@ -766,7 +776,14 @@ def _blrprx_sample(
             beta * storm_durations[i]
         )  # n_cells_per_storm = 1 + rng.poisson(beta * storm_durations, size=n_storm)
         total_cells += n_cells_per_storm[i]
-        storm_info[i] = (storm_starts[i], storm_durations[i], eta[i], mux[i], gamma, beta)
+        storm_info[i] = (
+            storm_starts[i],
+            storm_durations[i],
+            eta[i],
+            mux[i],
+            gamma,
+            beta,
+        )
 
     # Pre-allocate arrays
     cell_starts = np.empty(total_cells)  # (total_cells, )
@@ -775,20 +792,20 @@ def _blrprx_sample(
 
     cells_start_idx = 0
     for i, (s, d) in enumerate(zip(storm_starts, storm_durations)):
-        cell_starts[
-            cells_start_idx
-        ] = s  # First cell starts at the same time as the storm
-        cell_starts[
-            cells_start_idx + 1 : cells_start_idx + n_cells_per_storm[i]
-        ] = rng.uniform(s, s + d, n_cells_per_storm[i] - 1)
+        cell_starts[cells_start_idx] = (
+            s  # First cell starts at the same time as the storm
+        )
+        cell_starts[cells_start_idx + 1 : cells_start_idx + n_cells_per_storm[i]] = (
+            rng.uniform(s, s + d, n_cells_per_storm[i] - 1)
+        )
 
-        cell_durations[
-            cells_start_idx : cells_start_idx + n_cells_per_storm[i]
-        ] = rng.exponential(scale=1 / eta[i], size=n_cells_per_storm[i])
+        cell_durations[cells_start_idx : cells_start_idx + n_cells_per_storm[i]] = (
+            rng.exponential(scale=1 / eta[i], size=n_cells_per_storm[i])
+        )
 
-        cell_intensities[
-            cells_start_idx : cells_start_idx + n_cells_per_storm[i]
-        ] = intensity_sampler(rng, mux[i], sigmax_mux, n_cells_per_storm[i])
+        cell_intensities[cells_start_idx : cells_start_idx + n_cells_per_storm[i]] = (
+            intensity_sampler(rng, mux[i], sigmax_mux, n_cells_per_storm[i])
+        )
         cells_start_idx += n_cells_per_storm[i]
 
     cell_ends = cell_starts + cell_durations  # (total_cells, )
