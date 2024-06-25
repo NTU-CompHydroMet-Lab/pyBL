@@ -7,7 +7,7 @@
   <br>
 </h1> -->
 
-<h4 align="center">pyBL: An open-source Python package for stochastic modeling of rainfall using the Bartlett-Lewis Rectangular Pulse model.</h4>
+<h2 align="center">pyBL: An open-source Python package for stochastic modeling of rainfall using the Bartlett-Lewis Rectangular Pulse model.</h2>
 
 <p align="center">
   <a href="http://makeapullrequest.com">
