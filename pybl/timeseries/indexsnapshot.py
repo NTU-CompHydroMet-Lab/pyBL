@@ -396,10 +396,15 @@ def _isnapshot_check(
 
     # Check if time and intensity have the same length
     if time.size != intensity.size:
-        raise ValueError("time and intensity must have the same length")
+        raise ValueError("time and intensity must have the same length")        
+
     # Check if time and intensity are 1D arrays
     if time.ndim != 1 or intensity.ndim != 1:
         raise ValueError("time and intensity must be 1D arrays")
+
+    if time.size < 2:
+        raise ValueError(f"time and intensity must have at least 2 elements. Got {time.size}.")
+
     # Check if the RLE time is strictly increasing.
     if np.any(np.diff(time) <= 0):
         raise ValueError("time must be strictly increasing")
@@ -407,8 +412,19 @@ def _isnapshot_check(
     if np.any(np.isnan(time)):
         raise ValueError("time must not contain any nan")
     # Add ending time and intensity if there isn't one
+
+    unique_dt = np.unique(np.diff(time))
+
+    if len(unique_dt) == 0:
+        raise ValueError("time must have at least 2 unique values")
+
+    # Calculate count of unique time intervals
+    unique_dt_count = np.bincount(np.searchsorted(unique_dt, np.diff(time)))
+    # Use the most common time interval as the time interval
+    time_interval = unique_dt[np.argmax(unique_dt_count)]
+
     if not np.isnan(intensity[-1]):
-        time = np.append(time, time[-1] + 1)
+        time = np.append(time, time[-1] + time_interval)
         intensity = np.append(intensity, np.nan)
 
     # Check if all np.nan are at the end of the intensity timeseries
@@ -803,7 +819,7 @@ def _isnapshot_coef_var(
     # Coefficient of variation
     mean = _isnapshot_mean(time, intensity)
 
-    if mean == 0:
+    if np.isclose(mean, 0, atol=1e-15):
         return np.nan
 
     return _isnapshot_standard_deviation(time, intensity, biased) / mean
@@ -842,8 +858,7 @@ def _isnapshot_skew(
     mean = depth / duration
 
     stddev = _isnapshot_standard_deviation(time, intensity, biased=True)
-
-    if stddev == 0:
+    if np.isclose(stddev, 0, atol=1e-15):
         return np.nan
 
     skewness = 0
@@ -930,7 +945,7 @@ def _isnapshot_acf(
 
     sse = _isnapshot_sum_squared_error(time, intensity)
 
-    if sse == 0:
+    if np.isclose(sse, 0, atol=1e-15):
         return np.nan
 
     shift = 0
@@ -954,7 +969,7 @@ def _isnapshot_acf(
             ) * size
             x_idx += 1
         else:
-            if np.isnan(intensity[y_idx - 1]):
+            if np.isnan(intensity[x_idx - 1]) or np.isnan(intensity[y_idx - 1]):
                 y_idx += 1
                 continue
             size = time[y_idx] - max(time[y_idx - 1], (time[x_idx - 1] - lag))
@@ -965,6 +980,9 @@ def _isnapshot_acf(
 
     return result / sse
 
+@nb.njit("f8(f8, f8)", cache=True)
+def mod(a: float, b: float) -> float:
+    return a - b * np.floor(a / b)
 
 @nb.njit("UniTuple(f8[:], 2)(f8[:], f8[:], f8, f8)", cache=True)
 def _isnapshot_rescale(
@@ -1006,13 +1024,14 @@ def _isnapshot_rescale(
     time_index = len(time) - 1
     scale_time = np.full(time_index * 3 + 2, np.nan)
     scale_intensity = np.full(time_index * 3 + 2, np.nan)
-
+    #scale_time = np.zeros(time_index * 3 + 2)
+    #scale_intensity = np.zeros(time_index * 3 + 2)
 
     scale_time[0] = np.nan
     rescale_idx = 1
     for i in range(time_index):
         srt, end = time[i], time[i + 1]
-        r_srt, r_end = srt // scale, end // scale
+        r_srt, r_end = np.floor(srt / scale), np.floor(end / scale)
         intensity_i = intensity[i]
 
         # Case 1 might overshot. Case 3 and Case 2 almost always overshot. As you can see in their blow diagram.
@@ -1044,12 +1063,12 @@ def _isnapshot_rescale(
             if np.isnan(intensity_i):
                 pass
             elif np.isnan(scale_intensity[rescale_idx]):
-                scale_intensity[rescale_idx] = intensity_i * (scale - srt % scale)
+                scale_intensity[rescale_idx] = intensity_i * (scale - mod(srt, scale))
             else:
-                scale_intensity[rescale_idx] += intensity_i * (scale - srt % scale)
+                scale_intensity[rescale_idx] += intensity_i * (scale - mod(srt, scale))
             rescale_idx += 1
 
-            if end % scale == 0:
+            if np.isclose(mod(end, scale), 0, atol=1e-10):
                 # It means that the end time is the same as the next rescale time.
                 # We shouldn't add the intensity 0 to the next rescale time.
                 # Because it might make nan intensity to be 0. Which is wrong.
@@ -1059,9 +1078,9 @@ def _isnapshot_rescale(
             if np.isnan(intensity_i):
                 pass
             elif np.isnan(scale_intensity[rescale_idx]):
-                scale_intensity[rescale_idx] = intensity_i * (end % scale)
+                scale_intensity[rescale_idx] = intensity_i * mod(end, scale)
             else:
-                scale_intensity[rescale_idx] += intensity_i * (end % scale)
+                scale_intensity[rescale_idx] += intensity_i * mod(end, scale)
             rescale_idx += 1
             continue
 
@@ -1074,9 +1093,9 @@ def _isnapshot_rescale(
             if np.isnan(intensity_i):
                 pass
             elif np.isnan(scale_intensity[rescale_idx]):
-                scale_intensity[rescale_idx] = intensity_i * (scale - srt % scale)
+                scale_intensity[rescale_idx] = intensity_i * (scale - mod(srt, scale))
             else:
-                scale_intensity[rescale_idx] += intensity_i * (scale - srt % scale)
+                scale_intensity[rescale_idx] += intensity_i * (scale - mod(srt, scale))
             rescale_idx += 1
             
             scale_time[rescale_idx] = r_srt + 1
@@ -1088,7 +1107,7 @@ def _isnapshot_rescale(
                 scale_intensity[rescale_idx] += intensity_i * scale
             rescale_idx += 1
 
-            if end % scale == 0:
+            if np.isclose(mod(end, scale), 0, atol=1e-10):
                 # It means that the end time is the same as the next rescale time.
                 # We shouldn't add the intensity 0 to the next rescale time.
                 # Because it might make nan intensity to be 0. Which is wrong.
@@ -1098,9 +1117,9 @@ def _isnapshot_rescale(
             if np.isnan(intensity_i):
                 pass
             elif np.isnan(scale_intensity[rescale_idx]):
-                scale_intensity[rescale_idx] = intensity_i * (end % scale)
+                scale_intensity[rescale_idx] = intensity_i * mod(end, scale)
             else:
-                scale_intensity[rescale_idx] += intensity_i * (end % scale)
+                scale_intensity[rescale_idx] += intensity_i * mod(end, scale)
             rescale_idx += 1
             continue
 
@@ -1137,5 +1156,8 @@ def _isnapshot_rescale(
 
         ## Current intensity is float. Round it to atol.
         #scale_intensity[i] = np.round(scale_intensity[i], round_digit)
+        
+    # Replace all np.nan in scale_intensity to 0
+    #scale_intensity[np.isnan(scale_intensity)] = 0
 
     return scale_time[diff_time], scale_intensity[diff_time]

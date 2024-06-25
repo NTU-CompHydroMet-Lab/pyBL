@@ -80,3 +80,59 @@ def bochum_stats_weight(
     stats = np.load(os.path.join(os.path.dirname(__file__), "data", "bochum_stats.npy"))
     weight = np.load(os.path.join(os.path.dirname(__file__), "data", "bochum_weight.npy"))
     return stats, weight
+
+@pytest.fixture(scope="session")
+def fuzzy_short_data() -> list[tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]]:
+    """
+    Generate a fuzzy time series data.
+
+    return:
+    --------------
+        data: npt.NDArray[np.float64]
+            A fuzzy time series data with the shape of (N, 2, T).
+    """
+    rng = np.random.RandomState(0)
+    N = 10000
+    data = []
+    for i in range(N):
+        length = rng.randint(2, 10)
+
+        time_interval = rng.randint(1, 100, size=1)[0]
+        time_start = rng.randint(-length, length, size=1)[0]
+        time = np.arange(time_start, time_start+length)*time_interval
+
+        intensity = rng.rand(length)
+        nan_ratio = rng.rand()
+        nan_index = rng.choice(np.arange(length), size=int(length*nan_ratio), replace=False)
+        intensity[nan_index] = np.nan
+
+        data.append((time, intensity))
+    
+    return data
+
+@pytest.fixture(scope="session")
+def fuzzy_long_data() -> list[tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]]:
+    """
+    Generate a fuzzy time series data.
+
+    return:
+    --------------
+        data: npt.NDArray[np.float64]
+            A fuzzy time series data with the shape of (N, 2, T).
+    """
+    rng = np.random.RandomState(0)
+    N = 100
+    data = []
+    for i in range(N):
+        length = rng.randint(1000, 10000)
+
+        time_interval = rng.randint(1, 100, size=1)
+
+        intensity = rng.rand(length)
+        nan_ratio = rng.rand()
+        nan_index = rng.choice(np.arange(length), size=int(length*nan_ratio), replace=False)
+        intensity[nan_index] = np.nan
+
+        data.append((np.arange(length)*time_interval, intensity))
+    
+    return data

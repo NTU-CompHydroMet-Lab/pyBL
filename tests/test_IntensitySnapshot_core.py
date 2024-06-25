@@ -435,6 +435,72 @@ def test_skewness_with_nan_core_vs_np_pd(bochum_data_np, bochum_data_pd):
         rtol=1e-10,
     )
 
+def test_acf_core_vs_isnap(elmdon_data_np):
+    elm_time, elm_intensity = elmdon_data_np
+
+    # The intensity is in the unit of mm/hr. So we divide the time by 3600 to convert it to hours.
+    elm_isnap = IndexedSnapshot(elm_time / 3600, elm_intensity)
+    elm_isnap_acf = elm_isnap.autocorr_coef()
+
+    elm_raw_time = elm_time / 3600
+    elm_raw_acf = _isnapshot_acf(
+        np.append(elm_raw_time, elm_raw_time[-1] + 1), np.append(elm_intensity, np.nan), lag=1
+    )
+
+    assert np.allclose(elm_isnap_acf, elm_raw_acf, rtol=1e-10)
+
+def test_acf_core_vs_np_pd(elmdon_data_np, elmdon_data_pd):
+    # We don't comapre with pandas.autocorr. Because it uses Pearson correlation coefficient.
+    elm_time, elm_intensity = elmdon_data_np
+
+    elm_raw_time = elm_time / 3600
+    elm_raw_acf = _isnapshot_acf(
+        np.append(elm_raw_time, elm_raw_time[-1] + 1), np.append(elm_intensity, np.nan), lag=1
+    )
+
+    mean = np.mean(elm_intensity)
+    x_i = elm_intensity[:-1]
+    y_i = elm_intensity[1:]
+    xi_minus_mean = x_i - mean
+    yi_minus_mean = y_i - mean
+    numerator = np.sum(xi_minus_mean * yi_minus_mean)
+    denominator = np.sum((elm_intensity - mean) ** 2)
+
+    assert np.allclose(elm_raw_acf, numerator/denominator, rtol=1e-10)
+
+def test_acf_with_nan_core_vs_isnap(bochum_data_np):
+    boc_time, boc_intensity = bochum_data_np
+
+    boc_isnap = IndexedSnapshot(boc_time / 300, boc_intensity)
+    boc_isnap_acf = boc_isnap.autocorr_coef()
+
+    boc_raw_time = boc_time / 300
+    boc_raw_acf = _isnapshot_acf(
+        np.append(boc_raw_time, boc_raw_time[-1] + 1), np.append(boc_intensity, np.nan), lag=1
+    )
+
+    assert np.allclose(boc_isnap_acf, boc_raw_acf, rtol=1e-10)
+
+def test_acf_with_nan_core_vs_pd(bochum_data_np, bochum_data_pd):
+        # We don't comapre with pandas.autocorr. Because it uses Pearson correlation coefficient.
+
+    boc_time, boc_intensity = bochum_data_np
+
+    boc_raw_time = boc_time / 300
+    boc_raw_acf = _isnapshot_acf(
+        np.append(boc_raw_time, boc_raw_time[-1] + 1), np.append(boc_intensity, np.nan), lag=1
+    )
+
+    mean = np.nanmean(boc_intensity)
+    x_i = boc_intensity[:-1]
+    y_i = boc_intensity[1:]
+    xi_minus_mean = x_i - mean
+    yi_minus_mean = y_i - mean
+    numerator = np.nansum(xi_minus_mean * yi_minus_mean)
+    denominator = np.nansum((boc_intensity - mean) ** 2)
+
+    assert np.allclose(boc_raw_acf, numerator/denominator, rtol=1e-10)
+
 def test_rescale_core_vs_isnap(elmdon_data_np):
     elm_time, elm_intensity = elmdon_data_np
 
@@ -489,10 +555,10 @@ def test_rescale_core_vs_pd(elmdon_data_np, elmdon_data_pd):
     elm_time, elm_intensity = elmdon_data_np
 
     elm_isnap = IndexedSnapshot(elm_time / 3600, elm_intensity)
-    isnap_time_3, isnap_intensity_3 = elm_isnap.rescale(3, 1e-10).unpack()
-    isnap_time_6, isnap_intensity_6 = elm_isnap.rescale(6, 1e-10).unpack()
-    isnap_time_12, isnap_intensity_12 = elm_isnap.rescale(12, 1e-10).unpack()
-    isnap_time_24, isnap_intensity_24 = elm_isnap.rescale(24, 1e-10).unpack()
+    _, isnap_intensity_3 = elm_isnap.rescale(3, 1e-10).unpack()
+    _, isnap_intensity_6 = elm_isnap.rescale(6, 1e-10).unpack()
+    _, isnap_intensity_12 = elm_isnap.rescale(12, 1e-10).unpack()
+    _, isnap_intensity_24 = elm_isnap.rescale(24, 1e-10).unpack()
 
 
     # Calculate time difference between 3 index in the pandas data
@@ -502,10 +568,6 @@ def test_rescale_core_vs_pd(elmdon_data_np, elmdon_data_pd):
     elm_pd_12 = elmdon_data_pd.resample(time_dif*12).sum()
     elm_pd_24 = elmdon_data_pd.resample(time_dif*24).sum()
 
-    #for i, value in enumerate(intensity_3):
-        #if value != elm_pd_3.values[i]:
-            #print(value, elm_pd_3.values[i], np.isclose(value, elm_pd_3.values[i], rtol=1e-10))
-#
     assert np.allclose(isnap_intensity_3, elm_pd_3.values, rtol=1e-10)
     assert np.allclose(isnap_intensity_6, elm_pd_6.values, rtol=1e-10)
     assert np.allclose(isnap_intensity_12, elm_pd_12.values, rtol=1e-10)
@@ -514,14 +576,13 @@ def test_rescale_core_vs_pd(elmdon_data_np, elmdon_data_pd):
 def test_rescale_with_nan_core_vs_isnap(bochum_data_np):
     boc_time, boc_intensity = bochum_data_np
 
-    # The intensity is in the unit of mm/hr. So we divide the time by 3600 to convert it to hours.
-    boc_isnap = IndexedSnapshot(boc_time / 3600, boc_intensity)
+    boc_isnap = IndexedSnapshot(boc_time / 300, boc_intensity)
     boc_isnap_rescaled_3 = boc_isnap.rescale(3, 1e-10)
     boc_isnap_rescaled_6 = boc_isnap.rescale(6, 1e-10)
     boc_isnap_rescaled_12 = boc_isnap.rescale(12, 1e-10)
     boc_isnap_rescaled_24 = boc_isnap.rescale(24, 1e-10)
 
-    boc_raw_time = boc_time / 3600
+    boc_raw_time = boc_time / 300
     boc_raw_time_rescaled_3, boc_raw_intensity_rescaled_3 = _isnapshot_rescale(
         np.append(boc_raw_time, boc_raw_time[-1] + 1), np.append(boc_intensity, np.nan), 3, 1e-10
     )
@@ -536,10 +597,11 @@ def test_rescale_with_nan_core_vs_isnap(bochum_data_np):
     )
 
     # Intensity is different due to floating point error. The amout of addition is different for isnap intensity and raw intensity.
+    for i in range(len(boc_raw_time_rescaled_3)):
+        if not np.isclose(boc_isnap_rescaled_3.time[i], boc_raw_time_rescaled_3[i], rtol=1e-10):
+            print(i)
+            print(boc_isnap_rescaled_3.time[i-2: i+3], boc_raw_time_rescaled_3[i-2: i+3], np.isclose(boc_isnap_rescaled_3.time[i], boc_raw_time_rescaled_3[i], rtol=1e-10))
     assert np.all(boc_isnap_rescaled_3.time == boc_raw_time_rescaled_3)
-    #for i in range(len(boc_raw_intensity_rescaled_3)):
-    #    if not np.isclose(boc_isnap_rescaled_3.intensity[i], boc_raw_intensity_rescaled_3[i], rtol=1e-10):
-    #        print(boc_isnap_rescaled_3.intensity[i], boc_raw_intensity_rescaled_3[i], np.isclose(boc_isnap_rescaled_3.intensity[i], boc_raw_intensity_rescaled_3[i], rtol=1e-10))
     assert np.allclose(boc_isnap_rescaled_3.intensity[:-1], boc_raw_intensity_rescaled_3[:-1], rtol=1e-10, equal_nan=True)
     assert np.all(boc_isnap_rescaled_6.time == boc_raw_time_rescaled_6)
     assert np.allclose(boc_isnap_rescaled_6.intensity[:-1], boc_raw_intensity_rescaled_6[:-1], rtol=1e-10, equal_nan=True)
@@ -566,55 +628,17 @@ def test_rescale_with_nan_core_vs_pd(bochum_data_np, bochum_data_pd):
     print(f"Is there nan in Series intensity? Ans: ", np.any(np.isnan(bochum_data_pd)))
 
     boc_isnap = IndexedSnapshot(boc_time / 300, boc_intensity)
-    isnap_time_org, isnap_intensity_org = boc_isnap.unpack()
-    isnap_time_5m, isnap_intensity_5m = boc_isnap.rescale(1, 1e-10).unpack()
-    isnap_time_1h, isnap_intensity_1h = boc_isnap.rescale(12, 1e-10).unpack()
-    isnap_time_6h, isnap_intensity_6h = boc_isnap.rescale(72, 1e-10).unpack()
-    isnap_time_24h, isnap_intensity_24h = boc_isnap.rescale(288, 1e-10).unpack()
+    _, isnap_intensity_5m = boc_isnap.rescale(1, 1e-10).unpack()
+    _, isnap_intensity_1h = boc_isnap.rescale(12, 1e-10).unpack()
+    _, isnap_intensity_6h = boc_isnap.rescale(72, 1e-10).unpack()
+    _, isnap_intensity_24h = boc_isnap.rescale(288, 1e-10).unpack()
 
     # Calculate time difference between 3 index in the pandas data
     time_dif = bochum_data_pd.index[1] - bochum_data_pd.index[0]
-    print(f"Time difference: {time_dif}")
     boc_pd_5m = bochum_data_pd.resample(time_dif*1).sum(min_count=1)
-    print(f"Length of isnap intensity 5m: {len(isnap_intensity_5m)}")
-    print(f"Length of Series intensity 5m: {len(boc_pd_5m)}")
     boc_pd_1h = bochum_data_pd.resample(time_dif*12).sum(min_count=1)
-    print(f"Length of isnap intensity 1h: {len(isnap_intensity_1h)}")
-    print(f"Length of Series intensity 1h: {len(boc_pd_1h)}")
     boc_pd_6h = bochum_data_pd.resample(time_dif*72).sum(min_count=1)
-    print(f"Length of isnap intensity 6h: {len(isnap_intensity_6h)}")
-    print(f"Length of Series intensity 6h: {len(boc_pd_6h)}")
     boc_pd_24h = bochum_data_pd.resample(time_dif*288).sum(min_count=1)
-    print(f"Length of isnap intensity 24h: {len(isnap_intensity_24h)}")
-    print(f"Length of Series intensity 24h: {len(boc_pd_24h)}")
-
-    print(f"Number of nan in original numpy intensity: {np.sum(np.isnan(isnap_intensity_org))}") 
-
-    print(f"Is there nan in scaled 5m numpy intensity? Ans: ", np.any(np.isnan(isnap_intensity_5m)))
-    print(f"Number of nan in scaled 5m numpy intensity: {np.sum(np.isnan(isnap_intensity_5m))}")
-    print(f"Is there nan in scaled 5m Series intensity? Ans: ", np.any(np.isnan(boc_pd_5m.values)))
-    print(f"Number of nan in scaled 5m Series intensity: {np.sum(np.isnan(boc_pd_5m.values))}")
-    
-    print(f"Is there nan in scaled 1h numpy intensity? Ans: ", np.any(np.isnan(isnap_intensity_1h)))
-    print(f"Number of nan in scaled 1h numpy intensity: {np.sum(np.isnan(isnap_intensity_1h))}")
-    print(f"Is there nan in scaled 1h Series intensity? Ans: ", np.any(np.isnan(boc_pd_1h.values)))
-    print(f"Number of nan in scaled 1h Series intensity: {np.sum(np.isnan(boc_pd_1h.values))}")
-
-    print(f"Is there nan in scaled 6h numpy intensity? Ans: ", np.any(np.isnan(isnap_intensity_6h)))
-    print(f"Number of nan in scaled 6h numpy intensity: {np.sum(np.isnan(isnap_intensity_6h))}")
-    print(f"Is there nan in scaled 6h Series intensity? Ans: ", np.any(np.isnan(boc_pd_6h.values)))
-    print(f"Number of nan in scaled 6h Series intensity: {np.sum(np.isnan(boc_pd_6h.values))}")
-
-    print(f"Is there nan in scaled 24h numpy intensity? Ans: ", np.any(np.isnan(isnap_intensity_24h)))
-    print(f"Number of nan in scaled 24h numpy intensity: {np.sum(np.isnan(isnap_intensity_24h))}")
-    print(f"Is there nan in scaled 24h Series intensity? Ans: ", np.any(np.isnan(boc_pd_24h.values)))
-    print(f"Number of nan in scaled 24h Series intensity: {np.sum(np.isnan(boc_pd_24h.values))}")
-
-    for i in range(len(isnap_intensity_24h)):
-        if not np.isclose(isnap_intensity_24h[i], boc_pd_24h.values[i], rtol=1e-10, equal_nan=True):
-            print(isnap_time_24h[i], boc_pd_24h.index[i])
-            print(isnap_intensity_24h[i-3: i+4], boc_pd_24h.values[i-3: i+4], np.isclose(isnap_intensity_24h[i], boc_pd_24h.values[i], rtol=1e-10))
-            print()
 
     assert np.allclose(isnap_intensity_5m, boc_pd_5m.values, rtol=1e-10, equal_nan=True)
     assert np.allclose(isnap_intensity_1h, boc_pd_1h.values, rtol=1e-10, equal_nan=True)
