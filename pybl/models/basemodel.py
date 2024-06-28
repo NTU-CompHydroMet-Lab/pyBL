@@ -10,7 +10,7 @@ from pybl.raincell import ExponentialRCIModel, IConstantRCI
 BaseBLRP_RCIModel = Optional[Union[IConstantRCI, Type[IConstantRCI]]]
 
 
-class Stat_Props(Enum):
+class StatMetrics(Enum):
     MEAN = 0  # Mean
     CVAR = 1  # Coefficient of variation
     SKEWNESS = 2  # Skewness
