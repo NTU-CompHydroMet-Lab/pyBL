@@ -4,7 +4,6 @@ import numpy as np
 import numpy.typing as npt
 from typing import Tuple
 import os
-from pybl.utils.timeseries import preprocess_classic
 
 
 @pytest.fixture(scope="session")
@@ -78,8 +77,11 @@ def bochum_stats_weight(
     Statistical Properties and Weights for Bochum data.
     """
     stats = np.load(os.path.join(os.path.dirname(__file__), "data", "bochum_stats.npy"))
-    weight = np.load(os.path.join(os.path.dirname(__file__), "data", "bochum_weight.npy"))
+    weight = np.load(
+        os.path.join(os.path.dirname(__file__), "data", "bochum_weight.npy")
+    )
     return stats, weight
+
 
 @pytest.fixture(scope="session")
 def fuzzy_short_data() -> list[tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]]:
@@ -99,16 +101,19 @@ def fuzzy_short_data() -> list[tuple[npt.NDArray[np.float64], npt.NDArray[np.flo
 
         time_interval = rng.randint(1, 100, size=1)[0]
         time_start = rng.randint(-length, length, size=1)[0]
-        time = np.arange(time_start, time_start+length)*time_interval
+        time = np.arange(time_start, time_start + length) * time_interval
 
         intensity = rng.rand(length)
         nan_ratio = rng.rand()
-        nan_index = rng.choice(np.arange(length), size=int(length*nan_ratio), replace=False)
+        nan_index = rng.choice(
+            np.arange(length), size=int(length * nan_ratio), replace=False
+        )
         intensity[nan_index] = np.nan
 
         data.append((time, intensity))
-    
+
     return data
+
 
 @pytest.fixture(scope="session")
 def fuzzy_long_data() -> list[tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]]:
@@ -130,9 +135,11 @@ def fuzzy_long_data() -> list[tuple[npt.NDArray[np.float64], npt.NDArray[np.floa
 
         intensity = rng.rand(length)
         nan_ratio = rng.rand()
-        nan_index = rng.choice(np.arange(length), size=int(length*nan_ratio), replace=False)
+        nan_index = rng.choice(
+            np.arange(length), size=int(length * nan_ratio), replace=False
+        )
         intensity[nan_index] = np.nan
 
-        data.append((np.arange(length)*time_interval, intensity))
-    
+        data.append((np.arange(length) * time_interval, intensity))
+
     return data

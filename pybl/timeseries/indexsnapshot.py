@@ -7,10 +7,12 @@ from typing import (
     Union,
     overload,
 )
+from datetime import timedelta
 
 import numba as nb  # type: ignore
 import numpy as np
 import numpy.typing as npt
+
 
 __all__ = ["IndexedSnapshot"]
 
@@ -346,12 +348,15 @@ class IndexedSnapshot:
             return np.nan
         return _isnapshot_pDry(self._time, self._intensity, threshold=threshold)
 
-    def rescale(self, scale: float, abs_tol: float = 1e-10) -> IndexedSnapshot:
+    def rescale(self, scale: Union[float, timedelta], abs_tol: float = 1e-10) -> IndexedSnapshot:
         """
         Rescale the IndexedSnapshot timeseries to a different scale.
         New time index will be divided by the scale. And the intensity will be multiplied by the scale.
         All the time index will be divisible by the scale.
         """
+        if isinstance(scale, timedelta):
+            scale = scale.total_seconds() / 3600
+        
         if self._time.size == 0:
             return type(self)()
         scale_time, scale_intensity = _isnapshot_rescale(

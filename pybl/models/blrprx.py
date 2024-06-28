@@ -8,10 +8,14 @@ import numba as nb  # type: ignore
 import numpy as np
 import numpy.typing as npt
 import pandas as pd  # type: ignore
+import scipy as sp
+from datetime import timedelta
+from typing import Union
 
-from pybl.models import BaseBLRP, BaseBLRP_RCIModel, Stat_Props
+from pybl.models import BaseBLRP, BaseBLRP_RCIModel, StatMetrics
 from pybl.raincell import ExponentialRCIModel, IConstantRCI, Storm
 from pybl.timeseries import IndexedSnapshot
+import warnings
 
 
 @dataclass
@@ -71,13 +75,13 @@ class BLRPRx(BaseBLRP):
         # If user does not provide params, give the default values.
         if params is None:
             self.params = BLRPRx_params(
-                lambda_=0.016679,
-                phi=0.082,
-                kappa=0.349,
-                alpha=9.01,
-                nu=10,
-                sigmax_mux=1,
-                iota=0.97,
+                lambda_=5.0,
+                phi=5.0,
+                kappa=5.0,
+                alpha=5.0,
+                nu=5.0,
+                sigmax_mux=5.0,
+                iota=5.0,
             )
         else:
             self.params = params.copy()
@@ -117,34 +121,57 @@ class BLRPRx(BaseBLRP):
         f2 = self.rci_model.get_f2(sigmax_mux=self.params.sigmax_mux)
         return _blrprx_moment_3rd(timescale, f1, f2, *self.get_params().unpack())
 
-    def get_prop(
+    def get_stats(
         self,
-        prop: Stat_Props,
-        timescale: float = 1.0,
+        stat_metric: StatMetrics,
+        timescale: Union[float, timedelta] = 1.0,
     ) -> float:
-        if prop == Stat_Props.MEAN:
+        if isinstance(timescale, timedelta):
+            timescale = timescale.total_seconds() / 3600.0
+
+        if stat_metric == StatMetrics.MEAN:
             return self.mean(timescale)
-        elif prop == Stat_Props.VAR:
+        elif stat_metric == StatMetrics.VAR:
             return self.variance(timescale)
-        elif prop == Stat_Props.CVAR:
+        elif stat_metric == StatMetrics.CVAR:
             return np.sqrt(self.variance(timescale)) / self.mean(timescale)
-        elif prop == Stat_Props.AR1:
+        elif stat_metric == StatMetrics.AR1:
             return self.covariance(timescale, 1.0) / self.variance(timescale)
-        elif prop == Stat_Props.AR2:
+        elif stat_metric == StatMetrics.AR2:
             return self.covariance(timescale, 2.0) / self.variance(timescale)
-        elif prop == Stat_Props.AR3:
+        elif stat_metric == StatMetrics.AR3:
             return self.covariance(timescale, 3.0) / self.variance(timescale)
-        elif prop == Stat_Props.AC1:
+        elif stat_metric == StatMetrics.AC1:
             return self.covariance(timescale, 1.0)
-        elif prop == Stat_Props.AC2:
+        elif stat_metric == StatMetrics.AC2:
             return self.covariance(timescale, 2.0)
-        elif prop == Stat_Props.AC3:
+        elif stat_metric == StatMetrics.AC3:
             return self.covariance(timescale, 3.0)
-        elif prop == Stat_Props.SKEWNESS:
+        elif stat_metric == StatMetrics.SKEWNESS:
             return self.moment_3rd(timescale) / np.power(self.variance(timescale), 1.5)
         else:
             # Not implemented properties
             return 0.0
+    def get_stats_dataframe(
+        self,
+        stat_metrics: list[StatMetrics],
+        timescales: Union[list[float], list[timedelta]] = [1.0],
+    ) -> pd.DataFrame:
+        for scale in timescales:
+            if isinstance(scale, timedelta):
+                scale = scale.total_seconds() / 3600.0
+        
+        stats_arr = np.empty((len(timescales), len(stat_metrics)), dtype=np.float64)
+        for time_idx, scale in enumerate(timescales):
+            for prop_idx, prop in enumerate(stat_metrics):
+                stats_arr[time_idx, prop_idx] = self.get_stats(prop, scale)
+                
+        stats_df = pd.DataFrame(
+            stats_arr, columns=stat_metrics, index=timescales
+        )
+        stats_df.index.name = "timescale_hr"
+        
+        return stats_df
 
     def sample_raw(self, duration_hr: float) -> npt.NDArray[np.float64]:
         lambda_, phi, kappa, alpha, nu, sigmax_mux, iota = self.get_params().unpack()
@@ -259,50 +286,114 @@ class BLRPRx(BaseBLRP):
 
         return ts[0:duration_hr], storms  # type: ignore
 
+    def fit(
+        self,
+        stats: pd.DataFrame,
+        weight: pd.DataFrame,
+        rng: Optional[np.random.Generator] = None,
+        tol: float = 0.5,
+    ) -> dict:
+
+        warnings.filterwarnings("ignore", category=sp.optimize.OptimizeWarning)
+
+        if rng is None:
+            rng = np.random.default_rng()
+        bound = self.bound_estimation(stats, weight)
+
+        fitter = BLRPRxConfig(stats, weight, self.rci_model)
+        obj = fitter.get_evaluation_func()
+
+        for i in range(20):
+            if obj(np.array(self.params.unpack())) < tol:
+                break
+
+            # Clip the parameters to the bound
+            guess = np.clip(np.array(self.params.unpack()), *zip(*bound))
+
+            result_bh = sp.optimize.basinhopping(
+                obj,
+                x0=guess,
+                T=10,
+                stepsize=1,
+                niter=20,
+                minimizer_kwargs={"method": "Nelder-Mead", "bounds": bound},
+                seed=rng,
+            )
+
+            if obj(np.array(self.params.unpack())) > result_bh.fun:
+                self.update_params(BLRPRx_params(*result_bh.x))
+
+        if obj(np.array(self.params.unpack())) < tol:
+            status = "Success"
+        else:
+            status = "Maximum iteration reached"
+
+        stats_metrics = stats.columns.to_list()
+        timescales = stats.index.to_list()
+
+        report = {
+            "obj": obj,
+            "fun": obj(np.array(self.params.unpack())),
+            "x": self.params.unpack(),
+            "status": status,
+            "rci_model": self.rci_model.__class__.__name__,
+            "theo_stats": self.get_stats_dataframe(stat_metrics=stats_metrics, timescales=timescales),
+        }
+
+        return report
+        # if obj(np.array(self.params.unpack())) < result_bh.fun:
+        #    self.update_params(BLRPRx_params(*result_bh.x))
+
+    def bound_estimation(
+        self, target: pd.DataFrame, weight: pd.DataFrame
+    ) -> List[Tuple[float, float]]:
+        bound = [
+            (0.0001, 10.0),
+            (0.0001, 10.0),
+            (0.0001, 10.0),
+            (0.0001, 10.0),
+            (0.0001, 10.0),
+            (0.999, 1.0),
+            (0.0001, 10.0),
+        ]
+        return bound
+
 
 class BLRPRxConfig:
-    __slots__ = ("_mask", "_weight", "_target", "_rci_model")
+    __slots__ = ("_weight", "_stats", "_rci_model")
 
-    _mask: pd.DataFrame
     _weight: pd.DataFrame
-    _target: pd.DataFrame
+    _stats: pd.DataFrame
     _rci_model: IConstantRCI
 
     def __init__(
         self,
-        target: pd.DataFrame,
+        stats: pd.DataFrame,
         weight: pd.DataFrame,
-        mask: pd.DataFrame,
         rci_model: Optional[IConstantRCI] = None,
     ):
-        if not (target.shape == weight.shape == mask.shape):
-            raise ValueError("target, weight and mask must have the same shape")
+        if not (stats.shape == weight.shape):
+            raise ValueError("stats and weight must have the same shape")
 
         # Check if they have the same set of column regardless of order
-        if not (set(target.columns) == set(weight.columns) == set(mask.columns)):
-            raise ValueError(
-                "target, weight and mask must have the same set of columns"
-            )
+        if not (set(stats.columns) == set(weight.columns)):
+            raise ValueError("stats and weight must have the same set of columns")
 
         # Check if they have the same set of index regardless of order
-        if not (set(target.index) == set(weight.index) == set(mask.index)):
-            raise ValueError("target, weight and mask must have the same set of index")
+        if not (set(stats.index) == set(weight.index)):
+            raise ValueError("stats and weight must have the same set of index")
 
         # Make sure there isn't duplicate columns
-        if (
-            len(target.columns) != len(set(target.columns))
-            or len(weight.columns) != len(set(weight.columns))
-            or len(mask.columns) != len(set(mask.columns))
+        if len(stats.columns) != len(set(stats.columns)) or len(weight.columns) != len(
+            set(weight.columns)
         ):
-            raise ValueError("target, weight and mask must not have duplicate columns")
+            raise ValueError("stats and weight must not have duplicate columns")
 
         # Make sure there isn't duplicate index
-        if (
-            len(target.index) != len(set(target.index))
-            or len(weight.index) != len(set(weight.index))
-            or len(mask.index) != len(set(mask.index))
+        if len(stats.index) != len(set(stats.index)) or len(weight.index) != len(
+            set(weight.index)
         ):
-            raise ValueError("target, weight and mask must not have duplicate index")
+            raise ValueError("stats and weight must not have duplicate index")
 
         # Check if rci_model is None or IConstantRCI
         if rci_model is None:
@@ -312,13 +403,12 @@ class BLRPRxConfig:
         else:
             raise ValueError("rci_model must follow IConstantRCI protocol")
 
-        self._target = target.copy(deep=True)
+        self._stats = stats.copy(deep=True)
         self._weight = weight.copy(deep=True)
-        self._mask = mask.copy(deep=True)
 
     def get_evaluation_func(self) -> Callable[[npt.NDArray[np.float64]], np.float64]:
         """
-        Return a objective function based on your configuration of target, weight and mask.
+        Return a objective function based on your configuration of stats, weight and mask.
         It is a function that takes in a numpy array of 7 parameters and return a score.
 
         Note that the first time this function is called, it will take a while to compile.
@@ -328,158 +418,124 @@ class BLRPRxConfig:
         evaluation_func: Callable[[npt.NDArray[np.float64]], np.float64]
             A function that takes in a numpy array of 7 parameters and return a error score.
         """
-        scales = self._target.index.to_numpy()
-        stats_len = len(Stat_Props)
+        scales = self._stats.index.to_numpy()
+        stats_types_enum = self._stats.columns.values
+        for i, stat in enumerate(stats_types_enum):
+            if stat not in StatMetrics:
+                raise ValueError(f"Invalid StatMetrics: {stat}")
+        stats_types = np.array([stat.value for stat in stats_types_enum])
 
-        target_np = self._target.to_numpy()
+        stats_np = self._stats.to_numpy()
         weight_np = self._weight.to_numpy()
-        mask_np = self._mask.to_numpy().astype(np.bool_)
 
         f1_func = self._rci_model.get_f1
         f2_func = self._rci_model.get_f2
 
         @nb.njit
         def evaluation_func(x: npt.NDArray[np.float64]) -> np.float64:
-            predict = np.zeros((len(scales), stats_len), dtype=np.float64)
             # fmt: off
-            (l ,p ,k ,a ,n ,s ,i) = x  # noqa: E741.   lambda, phi, kappa, alpha, nu, sigma, iota
+            (_l ,_p ,_k ,_a ,_n ,_s ,_i) = x  # noqa: E741.   lambda, phi, kappa, alpha, nu, sigma, iota
+            
+            # If phi is 1. Many of the formula will have division by 0.
+            if _p == 1.0:
+                return np.float64(np.nan)
+
             # fmt: on
-            f1 = f1_func(s)
-            f2 = f2_func(s)
+            f1 = f1_func(_s)
+            f2 = f2_func(_s)
             score = np.float64(0)
             for t, scale in enumerate(scales):
-                mean = _blrprx_mean(scale, l, p, k, a, n, s, i)
-                variance = _blrprx_variance(scale, f1, l, p, k, a, n, s, i)
-                moment_3rd = _blrprx_moment_3rd(scale, f1, f2, l, p, k, a, n, s, i)
-                # if not mask_np[t, stat]:
-                # continue
-                if mask_np[t, 0]:  # Stat_Props.MEAN.value
-                    predict[t, 0] = mean
+                mean = _blrprx_mean(scale, _l, _p, _k, _a, _n, _s, _i)
+                variance = _blrprx_variance(scale, f1, _l, _p, _k, _a, _n, _s, _i)
+                if variance < 0:
+                    return np.float64(np.nan)
+                moment_3rd = _blrprx_moment_3rd(
+                    scale, f1, f2, _l, _p, _k, _a, _n, _s, _i
+                )
+
+                for stat_idx, stat in enumerate(stats_types):
+                    if weight_np[t, stat_idx] == 0:
+                        continue
+                    predict = 0
+                    if stat == 0:  # Stat_Props.MEAN.value
+                        predict = mean
+                    elif stat == 1:  # Stat_Props.CVAR.value
+                        predict = np.sqrt(variance) / mean
+                    elif stat == 2:  # Stat_Props.SKEWNESS.value
+                        predict = moment_3rd / np.power(variance, 1.5)
+                    elif stat == 3:  # Stat_Props.AR1.value
+                        predict = (
+                            _blrprx_covariance(
+                                scale, f1, 1.0, _l, _p, _k, _a, _n, _s, _i
+                            )
+                            / variance
+                        )
+                    elif stat == 4:  # Stat_Props.AR2.value
+                        predict = (
+                            _blrprx_covariance(
+                                scale, f1, 2.0, _l, _p, _k, _a, _n, _s, _i
+                            )
+                            / variance
+                        )
+                    elif stat == 5:  # Stat_Props.AR3.value
+                        predict = (
+                            _blrprx_covariance(
+                                scale, f1, 3.0, _l, _p, _k, _a, _n, _s, _i
+                            )
+                            / variance
+                        )
+                    elif stat == 6:  # Stat_Props.pDRY.value
+                        predict = 0
+                    elif stat == 7:  # Stat_Props.MSIT.value
+                        predict = 0
+                    elif stat == 8:  # Stat_Props.MSD.value
+                        predict = 0
+                    elif stat == 9:  # Stat_Props.MCIT.value
+                        predict = 0
+                    elif stat == 10:  # Stat_Props.MCD.value
+                        predict = 0
+                    elif stat == 11:  # Stat_Props.MCS.value
+                        predict = 0
+                    elif stat == 12:  # Stat_Props.MPC.value
+                        predict = 0
+                    elif stat == 13:  # Stat_Props.VAR.value
+                        predict = variance
+                    elif stat == 14:  # Stat_Props.AC1.value
+                        predict = _blrprx_covariance(
+                            scale, f1, 1.0, _l, _p, _k, _a, _n, _s, _i
+                        )
+                    elif stat == 15:  # Stat_Props.AC2.value
+                        predict = _blrprx_covariance(
+                            scale, f1, 2.0, _l, _p, _k, _a, _n, _s, _i
+                        )
+                    elif stat == 16:  # Stat_Props.AC3.value
+                        predict = _blrprx_covariance(
+                            scale, f1, 3.0, _l, _p, _k, _a, _n, _s, _i
+                        )
                     score += (
-                        np.power(predict[t, 0] - target_np[t, 0], 2) * weight_np[t, 0]
+                        np.power(predict - stats_np[t, stat_idx], 2)
+                        * weight_np[t, stat_idx]
                     )
-                if mask_np[t, 1]:  # Stat_Props.CVAR.value
-                    predict[t, 1] = np.sqrt(variance) / mean
-                    score += (
-                        np.power(predict[t, 1] - target_np[t, 1], 2) * weight_np[t, 1]
-                    )
-                if mask_np[t, 2]:  # Stat_Props.SKEWNESS.value
-                    predict[t, 2] = moment_3rd / np.power(variance, 1.5)
-                    score += (
-                        np.power(predict[t, 2] - target_np[t, 2], 2) * weight_np[t, 2]
-                    )
-                if mask_np[t, 3]:  # Stat_Props.AR1.value
-                    predict[t, 3] = (
-                        _blrprx_covariance(scale, f1, 1.0, l, p, k, a, n, s, i)
-                        / variance
-                    )
-                    score += (
-                        np.power(predict[t, 3] - target_np[t, 3], 2) * weight_np[t, 3]
-                    )
-                if mask_np[t, 4]:  # Stat_Props.AR2.value
-                    predict[t, 4] = (
-                        _blrprx_covariance(scale, f1, 2.0, l, p, k, a, n, s, i)
-                        / variance
-                    )
-                    score += (
-                        np.power(predict[t, 4] - target_np[t, 4], 2) * weight_np[t, 4]
-                    )
-                if mask_np[t, 5]:  # Stat_Props.AR3.value
-                    predict[t, 5] = (
-                        _blrprx_covariance(scale, f1, 3.0, l, p, k, a, n, s, i)
-                        / variance
-                    )
-                    score += (
-                        np.power(predict[t, 5] - target_np[t, 5], 2) * weight_np[t, 5]
-                    )
-                if mask_np[t, 6]:  # Stat_Props.pDRY.value
-                    predict[t, 6] = 0
-                    score += (
-                        np.power(predict[t, 6] - target_np[t, 6], 2) * weight_np[t, 6]
-                    )
-                if mask_np[t, 7]:  # Stat_Props.MSIT.value
-                    predict[t, 7] = 0
-                    score += (
-                        np.power(predict[t, 7] - target_np[t, 7], 2) * weight_np[t, 7]
-                    )
-                if mask_np[t, 8]:  # Stat_Props.MSD.value
-                    predict[t, 8] = 0
-                    score += (
-                        np.power(predict[t, 8] - target_np[t, 8], 2) * weight_np[t, 8]
-                    )
-                if mask_np[t, 9]:  # Stat_Props.MCIT.value
-                    predict[t, 9] = 0
-                    score += (
-                        np.power(predict[t, 9] - target_np[t, 9], 2) * weight_np[t, 9]
-                    )
-                if mask_np[t, 10]:  # Stat_Props.MCD.value
-                    predict[t, 10] = 0
-                    score += (
-                        np.power(predict[t, 10] - target_np[t, 10], 2)
-                        * weight_np[t, 10]
-                    )
-                if mask_np[t, 11]:  # Stat_Props.MCS.value
-                    predict[t, 11] = 0
-                    score += (
-                        np.power(predict[t, 11] - target_np[t, 11], 2)
-                        * weight_np[t, 11]
-                    )
-                if mask_np[t, 12]:  # Stat_Props.MPC.value
-                    predict[t, 12] = 0
-                    score += (
-                        np.power(predict[t, 12] - target_np[t, 12], 2)
-                        * weight_np[t, 12]
-                    )
-                if mask_np[t, 13]:  # Stat_Props.VAR.value
-                    predict[t, 13] = variance
-                    score += (
-                        np.power(predict[t, 13] - target_np[t, 13], 2)
-                        * weight_np[t, 13]
-                    )
-                if mask_np[t, 14]:  # Stat_Props.AC1.value
-                    predict[t, 14] = _blrprx_covariance(
-                        scale, f1, 1.0, l, p, k, a, n, s, i
-                    )
-                    score += (
-                        np.power(predict[t, 14] - target_np[t, 14], 2)
-                        * weight_np[t, 14]
-                    )
-                if mask_np[t, 15]:  # Stat_Props.AC2.value
-                    predict[t, 15] = _blrprx_covariance(
-                        scale, f1, 2.0, l, p, k, a, n, s, i
-                    )
-                    score += (
-                        np.power(predict[t, 15] - target_np[t, 15], 2)
-                        * weight_np[t, 15]
-                    )
-                if mask_np[t, 16]:  # Stat_Props.AC3.value
-                    predict[t, 16] = _blrprx_covariance(
-                        scale, f1, 3.0, l, p, k, a, n, s, i
-                    )
-                    score += (
-                        np.power(predict[t, 16] - target_np[t, 16], 2)
-                        * weight_np[t, 16]
-                    )
-            # return np.nansum(np.power(predict - target_np, 2) * weight_np * mask_np)
+            # return np.nansum(np.power(predict - stats_np, 2) * weight_np * mask_np)
             return score
 
         return evaluation_func
 
     @staticmethod
-    def default_target(timescale: List[float] = [1, 3, 6, 24]) -> pd.DataFrame:
+    def default_stats(timescale: List[float] = [1, 3, 6, 24]) -> pd.DataFrame:
         # Create a pandas dataframe with Stat_Props as columns one row with timescales=1,3,6,24
-        target_df = pd.DataFrame(
-            columns=[prop for prop in Stat_Props], index=timescale, dtype=np.float64
+        stats_df = pd.DataFrame(
+            columns=[prop for prop in StatMetrics], index=timescale, dtype=np.float64
         )
-        target_df.index.name = "timescales"
+        stats_df.index.name = "timescales"
 
-        return target_df
+        return stats_df
 
     @staticmethod
     def default_weight(timescale: List[float] = [1, 3, 6, 24]) -> pd.DataFrame:
         # Create a pandas dataframe with Stat_Props as columns one row with timescales=1,3,6,24
         weight_df = pd.DataFrame(
-            columns=[prop for prop in Stat_Props], index=timescale, dtype=np.float64
+            columns=[prop for prop in StatMetrics], index=timescale, dtype=np.float64
         )
         weight_df.index.name = "timescales"
         return weight_df
@@ -487,11 +543,11 @@ class BLRPRxConfig:
     @staticmethod
     def default_mask(timescale: List[float] = [1, 3, 6, 24]) -> pd.DataFrame:
         # Create a numpy array with Stat_Props as columns one row with timescales=1,3,6,24, with default value of False
-        mask_np = np.zeros((len(timescale), len(Stat_Props)), dtype=np.int_)
+        mask_np = np.zeros((len(timescale), len(StatMetrics)), dtype=np.int_)
         # Create a pandas dataframe with Stat_Props as columns one row with timescales=1,3,6,24, with default value of False
         mask_df = pd.DataFrame(
             data=mask_np,
-            columns=[prop for prop in Stat_Props],
+            columns=[prop for prop in StatMetrics],
             index=timescale,
             dtype=np.int_,
         )
@@ -514,7 +570,6 @@ def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
     ## TODO: Check if this is still required.
     # if alpha - k >= 171.0 or alpha >= 171.0:
     #    return np.inf
-
     return (
         np.power(nu / (nu + u), alpha)
         * np.power(nu + u, k)
