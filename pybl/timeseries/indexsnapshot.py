@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import (
     Any,
     List,
@@ -7,12 +8,10 @@ from typing import (
     Union,
     overload,
 )
-from datetime import timedelta
 
 import numba as nb  # type: ignore
 import numpy as np
 import numpy.typing as npt
-
 
 __all__ = ["IndexedSnapshot"]
 
@@ -356,7 +355,7 @@ class IndexedSnapshot:
         """
         if isinstance(scale, timedelta):
             scale = scale.total_seconds() / 3600
-        
+
         if self._time.size == 0:
             return type(self)()
         scale_time, scale_intensity = _isnapshot_rescale(
@@ -401,7 +400,7 @@ def _isnapshot_check(
 
     # Check if time and intensity have the same length
     if time.size != intensity.size:
-        raise ValueError("time and intensity must have the same length")        
+        raise ValueError("time and intensity must have the same length")
 
     # Check if time and intensity are 1D arrays
     if time.ndim != 1 or intensity.ndim != 1:
@@ -758,7 +757,7 @@ def _isnapshot_variance(
     """
     depth, duration = _isnapshot_sum_and_duration(time, intensity)
     sse = _isnapshot_sum_squared_error(time, intensity)
-    
+
     if duration - (biased is False) == 0:
         return np.nan
 
@@ -909,7 +908,7 @@ def _isnapshot_pDry(
         duration += time[i + 1] - time[i]
         if intensity[i] > threshold:
             wet_duration += time[i + 1] - time[i]
-        
+
     if duration == 0:
         return np.nan
 
@@ -1102,7 +1101,7 @@ def _isnapshot_rescale(
             else:
                 scale_intensity[rescale_idx] += intensity_i * (scale - mod(srt, scale))
             rescale_idx += 1
-            
+
             scale_time[rescale_idx] = r_srt + 1
             if np.isnan(intensity_i):
                 pass
@@ -1138,7 +1137,7 @@ def _isnapshot_rescale(
     # Preallocate boolean array
     diff_time = np.ones(len(scale_time), dtype=np.bool_)
     diff_time[0] = True
-    round_digit = int(-np.log10(abs_tol))
+    #round_digit = int(-np.log10(abs_tol))
     for i in range(1, len(scale_time)):
         # Skip current time index if it's the same as the previous one.
         ## Current intensity is the same as the previous one.
@@ -1161,7 +1160,7 @@ def _isnapshot_rescale(
 
         ## Current intensity is float. Round it to atol.
         #scale_intensity[i] = np.round(scale_intensity[i], round_digit)
-        
+
     # Replace all np.nan in scale_intensity to 0
     #scale_intensity[np.isnan(scale_intensity)] = 0
 

@@ -1,12 +1,14 @@
-from datetime import datetime, timezone, timedelta
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd  # type: ignore
 
-from pybl.timeseries import IndexedSnapshot
 from pybl.models import StatMetrics
+from pybl.timeseries import IndexedSnapshot
 
 
 def get_month_intervals(
@@ -178,7 +180,7 @@ def calculate_stats_matrix(
 
 
 def classic_statistics(
-    timeseries: pd.Series, timescale: list[timedelta], intensity_time_interval: timedelta
+    timeseries: pd.Series[float], timescale: list[timedelta], intensity_time_interval: timedelta
 ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]:
     """
     This function calculate the statistics of the input timeseries and return the target and weight matrix for fitting.
@@ -199,6 +201,7 @@ def classic_statistics(
     weight : pd.DataFrame
         The weight matrix for fitting. The columns are the statistics properties and the rows are the month and timescale.
     """
+
     scale_second = np.array([ts.total_seconds() for ts in timescale], dtype=np.float64)
     scale_hr = scale_second / 3600
 
@@ -212,13 +215,13 @@ def classic_statistics(
         timeseries.index = timeseries.index.to_timestamp()
     else:
         raise ValueError(f"The index of the timeseries should be either DatetimeIndex or PeriodIndex. Got {type(timeseries.index)}")
-    
+
     # Check the type of the intensity data. It should be a number that can be converted to float
     if not pd.api.types.is_numeric_dtype(timeseries):
         raise ValueError(f"The intensity data should be numeric. Got {timeseries.dtype}")
-    
 
-    unix_time = timeseries.index.astype("int64").to_numpy() // 10**9
+
+    unix_time = timeseries.index.to_numpy().astype(np.float64) // 10**9
     intensity = timeseries.to_numpy()
     # Replace all the negative intensity to np.nan
     intensity[intensity < 0] = np.nan

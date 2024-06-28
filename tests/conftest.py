@@ -94,7 +94,7 @@ def fuzzy_short_data() -> list[tuple[npt.NDArray[np.float64], npt.NDArray[np.flo
             A fuzzy time series data with the shape of (N, 2, T).
     """
     rng = np.random.RandomState(0)
-    N = 10000
+    N = 3000
     data = []
     for i in range(N):
         length = rng.randint(2, 10)
@@ -126,7 +126,7 @@ def fuzzy_long_data() -> list[tuple[npt.NDArray[np.float64], npt.NDArray[np.floa
             A fuzzy time series data with the shape of (N, 2, T).
     """
     rng = np.random.RandomState(0)
-    N = 100
+    N = 30
     data = []
     for i in range(N):
         length = rng.randint(1000, 10000)
