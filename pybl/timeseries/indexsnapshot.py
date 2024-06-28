@@ -431,14 +431,6 @@ def _isnapshot_check(
     if not np.isnan(intensity[-1]):
         time = np.append(time, time[-1] + time_interval)
         intensity = np.append(intensity, np.nan)
-    # Check if all np.nan are at the end of the intensity timeseries
-    if (num_of_nan := np.sum(np.isnan(intensity))) >= 1:
-        if not np.all(np.isnan(intensity[-num_of_nan:])):
-            raise ValueError("All np.nan must be at the end of the intensity timeseries")
-
-    if num_of_nan > 1:
-        time = time[:-num_of_nan+1]
-        intensity = intensity[:-num_of_nan+1]
 
     # Check if all np.nan are at the end of the intensity timeseries
     # if (num_of_nan := np.sum(np.isnan(intensity))) >= 1:
