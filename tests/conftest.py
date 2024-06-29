@@ -3,8 +3,33 @@ import pandas as pd
 import numpy as np
 import numpy.typing as npt
 from typing import Tuple
+import zipfile
+import shutil
 import os
 
+@pytest.fixture(scope="session", autouse=True)
+def unzip_data():
+    """
+    Unzip the data for testing.
+    """
+    current_dir = os.path.dirname(__file__)
+    data_zip = os.path.join(current_dir, "data", "data.zip")
+    extract_dir = os.path.join(current_dir, "data")
+
+    bochum_data = os.path.join(extract_dir, "bochum.csv")
+    elmdon_data = os.path.join(extract_dir, "elmdon.csv")
+    unzipped_files = []
+
+    with zipfile.ZipFile(data_zip, "r") as zip_ref:
+        zip_ref.extractall(extract_dir)
+        unzipped_files = zip_ref.namelist()
+
+    yield
+
+    for file in unzipped_files:
+        file_path = os.path.join(extract_dir, file)
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
 @pytest.fixture(scope="session")
 def elmdon_data_np() -> Tuple[npt.NDArray[np.int64], npt.NDArray[np.float64]]:
@@ -47,7 +72,7 @@ def bochum_data_np() -> Tuple[npt.NDArray[np.int64], npt.NDArray[np.float64]]:
     """
     Bochum data contains missing values (-1). All missing values are replaced with np.nan.
     """
-    data_path = os.path.join(os.path.dirname(__file__), "data", "bochum_5min.csv")
+    data_path = os.path.join(os.path.dirname(__file__), "data", "bochum.csv")
     data = pd.read_csv(data_path, parse_dates=["datatime"])
     data["datatime"] = data["datatime"].astype("int64") // 10**9
     time = data["datatime"].to_numpy()
@@ -62,7 +87,7 @@ def bochum_data_pd() -> pd.Series:
     """
     Bochum data contains missing values (-1). All missing values are replaced with np.nan.
     """
-    data_path = os.path.join(os.path.dirname(__file__), "data", "bochum_5min.csv")
+    data_path = os.path.join(os.path.dirname(__file__), "data", "bochum.csv")
     data = pd.read_csv(data_path, parse_dates=["datatime"], index_col="datatime")
     # Replace -1 with np.nan
     data["Bochum"] = data["Bochum"].replace(-1, np.nan)
