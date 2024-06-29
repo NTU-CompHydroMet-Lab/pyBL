@@ -1,9 +1,12 @@
 [tool.poetry]
-name = "pybl"
+name = "pyBLRP"
 version = "1.0.0"
 description = "Python implementation of the Bartlett-Lewis based model for rainfall simulation"
 authors = ["Kilin <jack233924@gmail.com>"]
 readme = "README.md"
+packages = [
+    { include = "pybl", from = "." }
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"
