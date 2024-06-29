@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pybl"
-version = "0.0.1"
+version = "1.0.0"
 description = "Python implementation of the Bartlett-Lewis based model for rainfall simulation"
 authors = ["Kilin <jack233924@gmail.com>"]
 readme = "README.md"

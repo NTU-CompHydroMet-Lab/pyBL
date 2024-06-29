@@ -16,10 +16,7 @@ def unzip_data():
     data_zip = os.path.join(current_dir, "data", "data.zip")
     extract_dir = os.path.join(current_dir, "data")
 
-    bochum_data = os.path.join(extract_dir, "bochum.csv")
-    elmdon_data = os.path.join(extract_dir, "elmdon.csv")
     unzipped_files = []
-
     with zipfile.ZipFile(data_zip, "r") as zip_ref:
         zip_ref.extractall(extract_dir)
         unzipped_files = zip_ref.namelist()
