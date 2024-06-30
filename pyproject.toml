@@ -26,6 +26,11 @@ pandas-stubs = "^2.1.1.230928"
 black = "^23.11.0"
 ipykernel = "^6.29.4"
 
+
+[tool.poetry.group.doc.dependencies]
+sphinx = "^7.3.7"
+pydata-sphinx-theme = "^0.15.4"
+
 [tool.pytest.ini_options]
 # Generate report for codecov. Need to install pytest-cov.
 addopts = ["--cov=pybl"]
