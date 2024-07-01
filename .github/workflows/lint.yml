@@ -5,7 +5,7 @@ on:
   - pull_request
 
 jobs:
-  lint:
+  linting-with-mypy-and-ruff:
     runs-on: ubuntu-latest
     strategy:
       matrix:
