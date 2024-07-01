@@ -10,18 +10,10 @@
 <h2 align="center">pyBL: An open-source Python package for stochastic modeling of rainfall using the Bartlett-Lewis Rectangular Pulse model.</h2>
 
 <p align="center">
-  <a href="http://makeapullrequest.com">
-    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg">
-  </a>
-  <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/tests.yml">
-    <img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/tests.yml/badge.svg">
-  </a>
-  <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/docs.yml">
-    <img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/docs.yml/badge.svg">
-  </a>
-  <a>
-    <img src="https://img.shields.io/pypi/pyversions/pyBLRP">
-  </a>
+  <a href="http://makeapullrequest.com"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a>
+  <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/tests.yml"><img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/tests.yml/badge.svg"></a>
+  <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/docs.yml"><img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/docs.yml/badge.svg"></a>
+  <a><img src="https://img.shields.io/pypi/pyversions/pyBLRP"></a>
 </p>
 
 ## Table of Content
