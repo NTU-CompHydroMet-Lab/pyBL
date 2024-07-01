@@ -1,13 +1,26 @@
+from typing import Optional, Union, overload
+
 import numpy as np
 import numpy.typing as npt
-from typing import Union, overload, Optional
 import pandas as pd
 
-@overload
-def generate(intensity: pd.Series, sample_size: int) -> pd.Series: ...
 
 @overload
-def generate(intensity: npt.NDArray, sample_size: int, epoch_time: Optional[npt.NDArray]) -> npt.NDArray: ...
+def generate(intensity: pd.Series[float], sample_size: int) -> pd.Series[float]: ...
 
-def generate(intensity: Union[pd.Series, npt.NDArray], sample_size: int, *args, **kwargs) -> Union[pd.Series, npt.NDArray]:
-    ...
+
+@overload
+def generate(
+    intensity: npt.NDArray[np.float64],
+    sample_size: int,
+    epoch_time: Optional[npt.NDArray[np.float64]],
+) -> npt.NDArray[np.float64]: ...
+
+
+def generate(
+    intensity: Union[pd.Series[float], npt.NDArray[np.float64]],
+    sample_size: int,
+    *args,
+    **kwargs
+) -> Union[pd.Series[float], npt.NDArray[np.float64]]:
+    return np.empty(0)

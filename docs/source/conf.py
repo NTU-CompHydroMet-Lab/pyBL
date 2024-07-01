@@ -16,7 +16,7 @@ on_rtd = os.environ.get("READTHEDOCS") == "True"
 project = "pyBL"
 copyright = "2023, KilinWei"
 author = "KilinWei"
-release = "0.0.1"
+release = "1.0.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -37,5 +37,5 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 master_doc = "index"
 
-html_theme = "furo"
+html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]

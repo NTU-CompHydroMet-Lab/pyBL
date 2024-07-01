@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Protocol, Type, Union
+from typing import Optional, Type, Union
 
 import numpy as np
 
@@ -30,7 +30,7 @@ class StatMetrics(Enum):
     AC3 = 16  # Autocorrelation lag 3 (Just covariance with different lags)
 
 
-class BaseBLRP(Protocol):
+class BaseBLRP():
     rci_model: IConstantRCI
     rng: np.random.Generator
 

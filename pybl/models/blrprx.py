@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 import math
+import warnings
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple
+from datetime import timedelta
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 import numba as nb  # type: ignore
 import numpy as np
 import numpy.typing as npt
 import pandas as pd  # type: ignore
-import scipy as sp
-from datetime import timedelta
-from typing import Union
+import scipy as sp  # type: ignore
 
 from pybl.models import BaseBLRP, BaseBLRP_RCIModel, StatMetrics
 from pybl.raincell import ExponentialRCIModel, IConstantRCI, Storm
 from pybl.timeseries import IndexedSnapshot
-import warnings
 
 
 @dataclass
@@ -85,6 +84,7 @@ class BLRPRx(BaseBLRP):
             )
         else:
             self.params = params.copy()
+
 
     def copy(self, rng: Optional[np.random.Generator] = None) -> BLRPRx:
         if rng is None:
@@ -157,20 +157,26 @@ class BLRPRx(BaseBLRP):
         stat_metrics: list[StatMetrics],
         timescales: Union[list[float], list[timedelta]] = [1.0],
     ) -> pd.DataFrame:
-        for scale in timescales:
-            if isinstance(scale, timedelta):
-                scale = scale.total_seconds() / 3600.0
-        
+        for scale_idx, scale in enumerate(timescales):
+            if not (isinstance(scale, float) or isinstance(scale, timedelta)):
+                raise ValueError("timescales must be a list of float or timedelta")
+
         stats_arr = np.empty((len(timescales), len(stat_metrics)), dtype=np.float64)
-        for time_idx, scale in enumerate(timescales):
+        for scale_idx, scale in enumerate(timescales):
+
+            if isinstance(scale, timedelta):
+                float_scale = scale.total_seconds() / 3600.0
+            elif isinstance(scale, float):
+                float_scale = scale
+
             for prop_idx, prop in enumerate(stat_metrics):
-                stats_arr[time_idx, prop_idx] = self.get_stats(prop, scale)
-                
+                stats_arr[scale_idx, prop_idx] = self.get_stats(prop, float_scale)
+
         stats_df = pd.DataFrame(
             stats_arr, columns=stat_metrics, index=timescales
         )
         stats_df.index.name = "timescale_hr"
-        
+
         return stats_df
 
     def sample_raw(self, duration_hr: float) -> npt.NDArray[np.float64]:
@@ -292,9 +298,10 @@ class BLRPRx(BaseBLRP):
         weight: pd.DataFrame,
         rng: Optional[np.random.Generator] = None,
         tol: float = 0.5,
-    ) -> dict:
+    ) -> dict[str, Any]:
 
         warnings.filterwarnings("ignore", category=sp.optimize.OptimizeWarning)
+
 
         if rng is None:
             rng = np.random.default_rng()
@@ -308,7 +315,8 @@ class BLRPRx(BaseBLRP):
                 break
 
             # Clip the parameters to the bound
-            guess = np.clip(np.array(self.params.unpack()), *zip(*bound))
+
+            guess = np.clip(np.array(self.params.unpack()), [b[0] for b in bound], [b[1] for b in bound])
 
             result_bh = sp.optimize.basinhopping(
                 obj,
@@ -328,7 +336,7 @@ class BLRPRx(BaseBLRP):
         else:
             status = "Maximum iteration reached"
 
-        stats_metrics = stats.columns.to_list()
+        stats_metrics: list[StatMetrics] = stats.columns.to_list() # type: ignore
         timescales = stats.index.to_list()
 
         report = {
@@ -435,7 +443,7 @@ class BLRPRxConfig:
         def evaluation_func(x: npt.NDArray[np.float64]) -> np.float64:
             # fmt: off
             (_l ,_p ,_k ,_a ,_n ,_s ,_i) = x  # noqa: E741.   lambda, phi, kappa, alpha, nu, sigma, iota
-            
+
             # If phi is 1. Many of the formula will have division by 0.
             if _p == 1.0:
                 return np.float64(np.nan)

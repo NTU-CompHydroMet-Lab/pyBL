@@ -40,7 +40,7 @@
 ## Model Description
 The Bartlett-Lewis Rectangular Pulses model, enhanced in this package, draws on the cutting-edge research presented in Onof and Wang (2020). It operates as a robust stochastic framework designed to simulate rainfall intensity effectively. By modelling the behavior of rainfall through a Poisson cluster point process, the package accounts for individual characteristics of rain cells and storm patterns, including cell duration, intensity, and overall storm duration. Enhanced by the latest scientific advances, this model offers improved accuracy in predicting and simulating the stochastic nature of rainfall events.
 
-![fig01-RBL](assets/fig01-RBL.png)
+![fig01-RBL](https://raw.githubusercontent.com/NTU-CompHydroMet-Lab/pyBL/main/assets/fig01-RBL.png)
 
 
 ## Workflow of pyBL
@@ -58,7 +58,7 @@ The pyBL package employs a systematic workflow to generate synthetic rainfall ti
 <!-- //CY: the necessarity of adding this line? -->
 <!-- For a detailed breakdown of each step, see our Detailed Workflow Documentation. -->
 
-![fig02-package-workflow](assets/fig02-package-workflow.png)
+![fig02-package-workflow](https://raw.githubusercontent.com/NTU-CompHydroMet-Lab/pyBL/main/assets/fig02-package-workflow.png)
 
 
 ## Installation Guide
