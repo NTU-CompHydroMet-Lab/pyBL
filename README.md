@@ -13,22 +13,24 @@
   <a href="http://makeapullrequest.com">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg">
   </a>
-  <a href="#">
-    <img src="https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square">
+  <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/tests.yml">
+    <img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/tests.yml/badge.svg">
+  </a>
+  <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/docs.yml">
+    <img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/docs.yml/badge.svg">
+  </a>
+  <a>
+    <img src="https://img.shields.io/pypi/pyversions/pyBLRP">
   </a>
 </p>
 
-<p align="center">
-  <a href="#key-features">Key Features</a> •
-  <a href="#model-description">Model Description</a> •
-  <a href="#workflow-of-pybl">Workflow of pyBL</a> •
-  <a href="#installation-guide">Installation Guide</a> •
-  <a href="#usage">Usage</a> •
-  <!-- <a href="#community">Community</a> • -->
-  <!-- <a href="#acknowledgements">Acknowledgements</a> • -->
-  <!-- <a href="#license">License</a> -->
-  <a href="#references">References</a>
-</p>
+## Table of Content
+
+- [Model Description](#model-description)
+- [Key Features](#key-features)
+- [Installation](#installation)
+- [Getting Started](#getting-started)
+
 
 ## Key Features
 - **Realistic rainfall Modelling**: Simulations of rainfall time series with realistic feaytures using the Bartlett-Lewis Rectangular Pulse model.
@@ -42,6 +44,11 @@ The Bartlett-Lewis Rectangular Pulses model, enhanced in this package, draws on 
 
 ![fig01-RBL](https://raw.githubusercontent.com/NTU-CompHydroMet-Lab/pyBL/main/assets/fig01-RBL.png)
 
+## Installation Guide
+To install the pyBL package, simply install with `pip`.
+```bash
+  pip install pyblrp
+```
 
 ## Workflow of pyBL
 
@@ -55,34 +62,20 @@ The pyBL package employs a systematic workflow to generate synthetic rainfall ti
 - Sampling storms and generating synthetic rainfall time series.
 - Rescaling and validating the synthesized time series.
 
+You can refer to the tutorial in [**`examples/quick_start`**](https://github.com/NTU-CompHydroMet-Lab/pyBL/blob/main/examples/quick_start/quick_start.ipynb).
+
 <!-- //CY: the necessarity of adding this line? -->
 <!-- For a detailed breakdown of each step, see our Detailed Workflow Documentation. -->
 
 ![fig02-package-workflow](https://raw.githubusercontent.com/NTU-CompHydroMet-Lab/pyBL/main/assets/fig02-package-workflow.png)
 
 
-## Installation Guide
-
-To install the pyBL package, follow these steps:
-
-1. **Clone the project:**
-
-   ```sh
-   git clone https://github.com/NTU-CompHydroMet-Lab/pyBL.git
-   cd pyBL
-   ```
-2. **Install dependencies:**
-
-   ```sh
-   pip install -r requirements.txt
-   ```
-
 ## Usage
 
 Here's a simple example of how to use the pyBL package:
 
 
-1. **Start quickly**: Begin with `quick_start.py`, which demonstrates the end-to-end process using historical rainfall data from Bochum, Germany.
+1. **Start quickly**: Begin with [**`examples/quick_start`**](https://github.com/NTU-CompHydroMet-Lab/pyBL/blob/main/examples/quick_start/quick_start.ipynb), which demonstrates the end-to-end process using historical rainfall data from Bochum, Germany.
 <!-- 
 2. **Some simple examples**
 
