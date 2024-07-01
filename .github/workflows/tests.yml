@@ -32,3 +32,4 @@ jobs:
           else
             tox
           fi
+        shell: bash
