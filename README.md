@@ -11,8 +11,9 @@
 
 <p align="center">
   <a href="http://makeapullrequest.com"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a>
-  <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/tests.yml"><img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/tests.yml/badge.svg"></a>
+  <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/test.yml"><img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/test.yml/badge.svg"></a>
   <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/docs.yml"><img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/docs.yml/badge.svg"></a>
+  <a href="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/lint.yml"><img src="https://github.com/NTU-CompHydroMet-Lab/pyBL/actions/workflows/lint.yml/badge.svg"></a>
   <a><img src="https://img.shields.io/pypi/pyversions/pyBLRP"></a>
 </p>
 

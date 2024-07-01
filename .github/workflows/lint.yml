@@ -5,14 +5,11 @@ on:
   - pull_request
 
 jobs:
-  tests:
-    runs-on: ${{ matrix.os }}
+  lint:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-            envs: ruff,mypy  # Specify environments to run only on Ubuntu
+        python-version: ['3.10']  # Adjust as necessary based on your setup
 
     steps:
       - uses: actions/checkout@v2
@@ -26,7 +23,7 @@ jobs:
           pip install poetry
       - name: Install dependencies with Poetry
         run: poetry install
-
-      - name: Test using poetry run tox
-        run: |
-          poetry run tox
+      - name: Run mypy
+        run: poetry run tox -e mypy
+      - name: Run ruff
+        run: poetry run tox -e ruff
