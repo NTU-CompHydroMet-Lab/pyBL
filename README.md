@@ -18,10 +18,11 @@
 
 ## Table of Content
 
-- [Model Description](#model-description)
 - [Key Features](#key-features)
-- [Installation](#installation)
-- [Getting Started](#getting-started)
+- [Model Description](#model-description)
+- [Installation](#installation-guide)
+- [Getting Started](#workflow-of-pyBL)
+- Documentation: https://ntu-comphydromet-lab.github.io/pyBL/
 
 
 ## Key Features
