@@ -5,25 +5,15 @@ on:
   - pull_request
 
 jobs:
-  linting-with-mypy-and-ruff:
+  linting:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.10']  # Adjust as necessary based on your setup
 
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-      - name: Install dependencies with Poetry
-        run: poetry install
-      - name: Run mypy
-        run: poetry run tox -e mypy
+        run: uv sync --group dev --python 3.10
+      - name: Run pyright
+        run: uv run pyright pybl
       - name: Run ruff
-        run: poetry run tox -e ruff
+        run: uv run ruff check pybl

@@ -1,2 +1,0 @@
-Coufiguring and Configuration File
-==================================

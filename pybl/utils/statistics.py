@@ -15,21 +15,22 @@ def get_month_intervals(
     start: Optional[Union[int, datetime]] = None,
     end: Optional[Union[int, datetime]] = None,
 ) -> npt.NDArray[np.float64]:
-    """
-    ### Note that the returned unix time is `UTC`.
-    Generate a 2D matrix of (nYear, 12, 2) of unix time interval of each month with its start and exclusive end unix time.
+    """Generate a 2D matrix of unix time intervals for each month.
+
+    The returned unix timestamps are in UTC.
 
     Parameters
     ----------
-    start : int, datetime, None
-        Start Year, default to be 1900
-    end : int, datetime, None
-        End Year, default to be 2100
+    start : int or datetime, optional
+        Start year. Defaults to 1900.
+    end : int or datetime, optional
+        End year. Defaults to 2100.
 
     Returns
     -------
-    np.ndarray
-        2D matrix of (nYear, 12, 2) of unix time interval of each month with its start and exclusive end unix time.
+    intervals : np.ndarray
+        Array of shape (nYear, 12, 2) containing the start and exclusive end
+        unix timestamps for each month.
     """
     if isinstance(start, int):
         start = datetime(start, 1, 1, 0, 0, 0)
@@ -54,22 +55,20 @@ def get_month_intervals(
 def to_year_month(
     unix_time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 ) -> npt.NDArray[np.float64]:
-    """
-    Convert input 1D array of unix time and intensity to 2D matrix of year and month.
-    With the shape of (nYear, 12). Each cell in the 2D matrix is a `IndexedSnapshot` object of that month.
+    """Convert 1D arrays of unix time and intensity to a 2D year-month matrix.
 
     Parameters
     ----------
-    unix_time : npt.NDArray
-        1D array of unix time. Unit: second
-    intensity : npt.NDArray
-        1D array of intensity data. Unit: mm/h
+    unix_time : np.ndarray
+        1D array of unix timestamps in seconds.
+    intensity : np.ndarray
+        1D array of intensity values in mm/h.
 
     Returns
     -------
-    npt.NDArray
-        2D matrix of year and month full of `IndexedSnapshot` objects.
-        With the shape of (nYear, 12).
+    series_year_month : np.ndarray
+        Array of shape (nYear, 12) where each cell is an
+        `IndexedSnapshot` for that month.
     """
     series = IndexedSnapshot(unix_time, intensity / 3600)
     # Gest starting year and ending year
@@ -96,28 +95,23 @@ def calculate_stats_matrix(
     intensity: npt.NDArray[np.float64],
     timescale: npt.NDArray[np.float64],
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """
-    This function calculate the statistics of the input timeseries and return the target and weight matrix for fitting.
+    """Calculate statistics of the input timeseries for model fitting.
 
     Parameters
     ----------
     timeindex : np.ndarray
-        1D array of unix time. Unit: second
-
+        1D array of unix timestamps in seconds.
     intensity : np.ndarray
-        1D array of intensity data. Unit: mm/s
-
+        1D array of intensity values in mm/s.
     timescale : np.ndarray
-        1D array of timescale. Unit: second
-
+        1D array of timescales in seconds.
 
     Returns
     -------
     target : np.ndarray
-        3D matrix of target. With the shape of (12 (month), nScale, nStats).
-
+        Shape (12, nScale, nStats) target matrix.
     weight : np.ndarray
-        3D matrix of weight. With the shape of (12 (month), nScale, nStats).
+        Shape (12, nScale, nStats) weight matrix.
     """
     timescale = np.array(timescale)
 
@@ -182,24 +176,26 @@ def calculate_stats_matrix(
 def classic_statistics(
     timeseries: pd.Series[float], timescale: list[timedelta], intensity_time_interval: timedelta
 ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]:
-    """
-    This function calculate the statistics of the input timeseries and return the target and weight matrix for fitting.
+    """Calculate statistics of the input timeseries for model fitting.
 
     Parameters
     ----------
     timeseries : pd.Series
-        The input timeseries data. The index of the series is datetime and the value is the intensity. The unit of the intensity should be mm/h.
-
-    timescale : list[timedelta]
-        The list of timescale that we want to calculate the statistics.
+        Input timeseries with a DatetimeIndex or PeriodIndex and intensity
+        values in mm/h.
+    timescale : list of timedelta
+        List of timescales to compute statistics over.
+    intensity_time_interval : timedelta
+        Time resolution of the input timeseries.
 
     Returns
     -------
-    target : pd.DataFrame
-        The target matrix for fitting. The columns are the statistics properties and the rows are the month and timescale.
-
-    weight : pd.DataFrame
-        The weight matrix for fitting. The columns are the statistics properties and the rows are the month and timescale.
+    target_df_list : list of pd.DataFrame
+        List of 12 DataFrames (one per month) with statistical targets.
+        Columns are `StatMetrics`; index is timescale in hours.
+    weight_df_list : list of pd.DataFrame
+        List of 12 DataFrames (one per month) with fitting weights.
+        Same structure as ``target_df_list``.
     """
 
     scale_second = np.array([ts.total_seconds() for ts in timescale], dtype=np.float64)

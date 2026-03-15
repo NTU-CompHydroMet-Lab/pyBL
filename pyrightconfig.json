@@ -1,5 +1,4 @@
 {
-    "exclude": [ ".venv" ],
-    "venvPath": ".",
-    "venv": ".venv/"
+    "venvPath": "/opt",
+    "venv": "venv"
 }

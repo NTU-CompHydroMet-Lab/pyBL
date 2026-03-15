@@ -166,7 +166,7 @@ class BLRPRx(BaseBLRP):
 
             if isinstance(scale, timedelta):
                 float_scale = scale.total_seconds() / 3600.0
-            elif isinstance(scale, float):
+            else:
                 float_scale = scale
 
             for prop_idx, prop in enumerate(stat_metrics):
@@ -415,16 +415,16 @@ class BLRPRxConfig:
         self._weight = weight.copy(deep=True)
 
     def get_evaluation_func(self) -> Callable[[npt.NDArray[np.float64]], np.float64]:
-        """
-        Return a objective function based on your configuration of stats, weight and mask.
-        It is a function that takes in a numpy array of 7 parameters and return a score.
+        """Return an objective function based on the configured stats and weights.
 
-        Note that the first time this function is called, it will take a while to compile.
+        The returned function takes a numpy array of 7 parameters and returns
+        a scalar error score. It is JIT-compiled with Numba on first call.
 
-        Returns:
-        --------
-        evaluation_func: Callable[[npt.NDArray[np.float64]], np.float64]
-            A function that takes in a numpy array of 7 parameters and return a error score.
+        Returns
+        -------
+        evaluation_func : callable
+            A function accepting a parameter array of shape (7,) and returning
+            a float64 error score.
         """
         scales = self._stats.index.to_numpy()
         stats_types_enum = self._stats.columns.values
@@ -565,9 +565,26 @@ class BLRPRxConfig:
 
 @nb.njit()
 def _blrprx_kernel(k: float, u: float, nu: float, alpha: float) -> float:
-    """
-    k: lag
-    u: timescale
+    """Compute the kernel function for BLRPRx moment calculations.
+
+    See Modelling rainfall with a Bartlett-Lewis process: new developments
+    (2020), Formula (5).
+
+    Parameters
+    ----------
+    k : float
+        Lag order.
+    u : float
+        Timescale.
+    nu : float
+        Scale parameter of the Gamma distribution for eta.
+    alpha : float
+        Shape parameter of the Gamma distribution for eta.
+
+    Returns
+    -------
+    kernel : float
+        Kernel value.
     """
     # Modelling rainfall with a Bartlett–Lewis process: new developments(2020) Formula (5)
 

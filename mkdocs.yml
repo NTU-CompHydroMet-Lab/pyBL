@@ -1,0 +1,41 @@
+site_name: pyBL
+site_description: Python implementation of the Bartlett-Lewis based model for rainfall simulation
+repo_url: https://github.com/NTU-CompHydroMet-Lab/pyBL
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          inventories:
+            - https://docs.python.org/3/objects.inv
+            - https://numpy.org/doc/stable/objects.inv
+            - https://pandas.pydata.org/docs/objects.inv
+          options:
+            show_source: true
+            show_bases: true
+            members_order: source
+            docstring_style: numpy
+
+nav:
+  - Home: index.md
+  - User Guide:
+      - Installation: user_guide/installation.md
+      - Configuration: user_guide/configuring.md
+  - API Reference:
+      - pybl: api/pybl.md
+      - pybl.models: api/pybl.models.md
+      - pybl.raincell: api/pybl.raincell.md
+      - pybl.timeseries: api/pybl.timeseries.md
+      - pybl.utils: api/pybl.utils.md
+  - Developer Guide:
+      - Contributing: developer_guide/contributing.md
+      - Testing: developer_guide/testing.md
+      - Building Docs: developer_guide/building_docs.md
+      - Packaging: developer_guide/packaging.md

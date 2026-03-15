@@ -46,10 +46,9 @@ class IndexedSnapshot:
         """
         Parameters
         ----------
-        time: Optional[Union[`np.ndarray`, `List`]]
+        time : array-like, optional
             Time index of the intensity timeseries.
-
-        intensity: Optional[Union[`np.ndarray`, `List`]]
+        intensity : array-like, optional
             Intensity values (mm/h) of the intensity timeseries.
         """
         self._time, self._intensity = _isnapshot_check(time, intensity)
@@ -59,19 +58,19 @@ class IndexedSnapshot:
     def fromDelta(
         cls, time: FloatArray, intensity_delta: FloatArray
     ) -> IndexedSnapshot:
-        """
-        Create an IndexedSnapshot timeseries from the delta encoded intensity timeseries.
+        """Create an IndexedSnapshot from delta-encoded intensity data.
 
         Parameters
         ----------
-        time: Optional[Union[`np.ndarray`, `List`]]
-            Time index of the intensity timeseries.
-            The order of the times does not matter.
-            Duplicate times will be summed together. (Because it's multiple delta at the same time)
+        time : array-like
+            Time indices. Order does not matter; duplicate times are summed.
+        intensity_delta : array-like
+            Delta-encoded intensity values in mm/h.
 
-        intensity_delta: Optional[Union[`np.ndarray`, `List`]]
-            Delta Encoded Intensity values (mm/h) of the intensity timeseries.
-
+        Returns
+        -------
+        snapshot : IndexedSnapshot
+            A new IndexedSnapshot instance.
         """
         # Check if time and intensity_delta is np.ndarray
         if not isinstance(time, np.ndarray) or time.dtype != np.float64:
@@ -88,55 +87,52 @@ class IndexedSnapshot:
 
     @property
     def time(self) -> npt.NDArray[np.float64]:
-        """
-        Return the time index of the IndexedSnapshot timeseries.
+        """Time index of the IndexedSnapshot timeseries.
 
         Returns
         -------
-        time : npt.NDArray[np.float64]
-            1D array of time index that follows IndexedSnapshot format.
-            Ending time is for indicating the end of the timeseries.
+        time : np.ndarray
+            1D array of time indices in IndexedSnapshot format. The final
+            element marks the end of the timeseries.
         """
         return self._time
 
     @property
     def intensity(self) -> npt.NDArray[np.float64]:
-        """
-        Return the intensity of the IndexedSnapshot timeseries.
+        """Intensity values of the IndexedSnapshot timeseries.
 
         Returns
         -------
-        intensity : npt.NDArray[np.float64]
-            1D array of intensity that follows IndexedSnapshot format.
-            Ending intensity is for indicating the end of the timeseries. So it's np.nan.
+        intensity : np.ndarray
+            1D array of intensities in IndexedSnapshot format. The final
+            element is np.nan, marking the end of the timeseries.
         """
         return self._intensity
 
     @property
     def intensity_delta(self) -> npt.NDArray[np.float64]:
-        """
-        Return the delta encoded intensity of the IndexedSnapshot timeseries.
+        """Delta-encoded intensity of the IndexedSnapshot timeseries.
 
         Returns
         -------
-        intensity_delta : npt.NDArray[np.float64] with shape (n, 2)
-            2D array of intensity that follows delta encoding format.
-            The first column is the time index.
-            The second column is the change in intensity.
+        intensity_delta : np.ndarray
+            2D array of shape (n, 2). First column is the time index;
+            second column is the change in intensity.
         """
         return self._intensity_delta
 
     def add(self, timeseries: IndexedSnapshot, sequential: bool = False) -> None:
-        """
-        Add another IndexedSnapshot timeseries to the current IndexedSnapshot timeseries.
+        """Add another IndexedSnapshot to this one in-place.
 
         Parameters
         ----------
         timeseries : IndexedSnapshot
-            The IndexedSnapshot timeseries to be added.
+            The IndexedSnapshot to add.
         sequential : bool, optional
-            If False, the timeseries will be added as its original time index.  So overlapping timeseries will be summed together in the overlapping region.
-            If True, the timeseries will be added sequentially. So the timeseries will be shifted to the right of the current timeseries.
+            If False, overlapping regions are summed at their original time
+            indices. If True, the added timeseries is shifted to start
+            immediately after the end of the current timeseries. Defaults to
+            False.
         """
         if len(timeseries.time) == 0:
             return
@@ -178,9 +174,7 @@ class IndexedSnapshot:
             raise TypeError("time_idx must be an int or a slice")
 
     def _get_slice_idx(self, time_idx: slice) -> IndexedSnapshot:
-        """
-        ### This is an internal function. You shouldn't use it directly unless you know what you are doing.
-        """
+        """Internal method for slice indexing. Use ``__getitem__`` instead."""
         if time_idx.start >= time_idx.stop:
             return type(self)()
         # Use binary search to find the index
@@ -204,9 +198,7 @@ class IndexedSnapshot:
         return type(self)(time, intensity)
 
     def _get_int_idx(self, time_idx: int) -> np.float64:
-        """
-        ### This is an internal function. You shouldn't use it directly unless you know what you are doing.
-        """
+        """Internal method for integer indexing. Use ``__getitem__`` instead."""
         # Use binary search to find the index
         idx = np.searchsorted(a=self._time, v=time_idx, side="right")
         if idx == 0 or idx == len(self._time):
@@ -220,14 +212,14 @@ class IndexedSnapshot:
         return time_value
 
     def sum(self) -> float:
-        """
-        Calculate the total depth of the intensity timeseries.
-        This value should roughly be the same after rescaling with any scale.
+        """Calculate the total depth of the intensity timeseries.
+
+        This value is conserved across rescaling operations.
 
         Returns
         -------
-        sum : float
-            The sum of depth of the intensity timeseries.
+        depth : float
+            Total depth.
         """
         if self._time.size == 0:
             return 0
@@ -235,123 +227,136 @@ class IndexedSnapshot:
         return depth
 
     def mean(self) -> float:
-        """
-        Calculate the mean of the intensity timeseries.
+        """Calculate the time-weighted mean intensity.
 
         Returns
         -------
         mean : float
-            The mean of the intensity timeseries.
+            Mean intensity, or np.nan if the timeseries is empty.
         """
         if self._time.size == 0:
             return np.nan
         return _isnapshot_mean(self._time, self._intensity)
 
     def sum_squared_error(self) -> float:
-        """
-        Calculate the sum of squared error of the intensity timeseries.
+        """Calculate the sum of squared deviations from the mean.
 
         Returns
         -------
-        sum of squared error: float
-            The sum of squared error of the intensity timeseries.
+        sse : float
+            Sum of squared error, or np.nan if the timeseries is empty.
         """
         if self._time.size == 0:
             return np.nan
         return _isnapshot_sum_squared_error(self._time, self._intensity)
 
     def autocorr_coef(self, lag: Optional[float] = 1) -> float:
-        """
-        Calculate the n-lag autocorrelation coefficient of the intensity timeseries.
-        It's basically Cov(X_t, X_{t+lag}) / Var(X_t)
+        """Calculate the n-lag autocorrelation coefficient.
+
+        Computed as Cov(X_t, X_{t+lag}) / Var(X_t).
 
         Parameters
         ----------
-        lag : int, optional
-            The lag of the autocorrelation coefficient, by default 1
+        lag : float, optional
+            Lag for the autocorrelation. Defaults to 1.
 
         Returns
         -------
-        n-lag Autocorrelation coefficient: float
+        acf : float
+            Autocorrelation coefficient, or np.nan if the timeseries is empty.
         """
         if self._time.size == 0:
             return np.nan
         return _isnapshot_acf(self._time, self._intensity, lag=lag)
 
     def variance(self, biased: bool = False) -> float:
-        """
-        Calculate the variance of the intensity timeseries.
+        """Calculate the variance of the intensity timeseries.
 
         Parameters
         ----------
         biased : bool, optional
-            Whether to use the biased estimator of the variance, by default False.
+            If True, use the biased estimator. Defaults to False.
 
         Returns
         -------
-        variance: float
+        var : float
+            Variance, or np.nan if the timeseries is empty.
         """
         if self._time.size == 0:
             return np.nan
         return _isnapshot_variance(self._time, self._intensity, biased=biased)
 
     def coef_variation(self, biased: bool = False) -> float:
-        """
-        Calculate the coefficient of variation of the intensity timeseries.
+        """Calculate the coefficient of variation.
 
         Parameters
         ----------
         biased : bool, optional
-            Whether to use the biased estimator of the standard deviation, by default False.
+            If True, use the biased standard deviation estimator. Defaults to
+            False.
 
         Returns
         -------
-        coefficient of variation: float
+        cv : float
+            Coefficient of variation, or np.nan if the timeseries is empty.
         """
         if self._time.size == 0:
             return np.nan
         return _isnapshot_coef_var(self._time, self._intensity, biased=biased)
 
     def skewness(self, biased: bool = True) -> float:
-        """
-        Calculate the skewness of the intensity timeseries.
-        The standard deviation is calculated with the biased estimator.
+        """Calculate the skewness of the intensity timeseries.
 
         Parameters
         ----------
-        biased_sd : bool, optional
-            Whether to use the biased estimator of the skewness, by default True.
+        biased : bool, optional
+            If True, use the biased skewness estimator. Defaults to True.
 
         Returns
         -------
-        skewness : float
+        skew : float
+            Skewness, or np.nan if the timeseries is empty.
         """
         if self._time.size == 0:
             return np.nan
         return _isnapshot_skew(self._time, self._intensity, biased=biased)
 
     def pDry(self, threshold: float = 0) -> float:
-        """
-        Calculate the probability of dryness of the intensity timeseries with a threshold.
+        """Calculate the probability of dryness.
 
         Parameters
         ----------
         threshold : float, optional
-            The threshold of dryness, by default 0
+            Intensity threshold below which a period is considered dry.
+            Defaults to 0.
 
         Returns
         -------
-        probability of dryness : float
+        p_dry : float
+            Fraction of time at or below threshold, or np.nan if empty.
         """
         if self._time.size == 0:
             return np.nan
         return _isnapshot_pDry(self._time, self._intensity, threshold=threshold)
 
     def rescale(self, scale: Union[float, timedelta], abs_tol: float = 1e-10) -> IndexedSnapshot:
-        """
-        Rescale the IndexedSnapshot timeseries to a different scale.
-        New time index will be divided by the scale. And the intensity will be multiplied by the scale.
-        All the time index will be divisible by the scale.
+        """Rescale the timeseries to a coarser time resolution.
+
+        Time indices are divided by scale and intensities multiplied by scale,
+        so that all resulting time indices are divisible by scale.
+
+        Parameters
+        ----------
+        scale : float or timedelta
+            Target scale in hours (float) or as a timedelta.
+        abs_tol : float, optional
+            Absolute tolerance for floating-point comparisons. Defaults to
+            1e-10.
+
+        Returns
+        -------
+        rescaled : IndexedSnapshot
+            A new IndexedSnapshot at the requested scale.
         """
         if isinstance(scale, timedelta):
             scale = scale.total_seconds() / 3600
@@ -364,8 +369,14 @@ class IndexedSnapshot:
         return type(self)(scale_time, scale_intensity)
 
     def unpack(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """
-        Unpack the IndexedSnapshot timeseries into a normal timeseries.
+        """Unpack the IndexedSnapshot into a regular dense timeseries.
+
+        Returns
+        -------
+        time : np.ndarray
+            1D array of time indices as a uniform-interval array.
+        intensity : np.ndarray
+            1D array of intensities as a uniform-interval array.
         """
         if self._time.size == 0:
             return np.array([], dtype=np.float64), np.array([], dtype=np.float64)
@@ -453,20 +464,17 @@ def _isnapshot_check(
 def _index_of_first_appearance_of_consecutive_value(
     arr: npt.NDArray[np.float64],
 ) -> npt.NDArray[np.int64]:
-    """
-    ### This is an internal function. You shouldn't use it directly unless you know what you are doing.
-
-    This function returns the index of the first appearance of each unique value in the array.
+    """Return indices of the first occurrence of each consecutive run.
 
     Parameters
     ----------
-    arr : npt.NDArray[np.float64]
+    arr : np.ndarray
         1D array of float64 values.
 
     Returns
     -------
-    index : npt.NDArray[np.int64]
-        1D array of int64 values.
+    indices : np.ndarray
+        1D array of int64 indices marking the start of each run.
     """
     is_first_appearance = np.zeros_like(arr, dtype=np.int64)
     is_first_appearance[0] = 1
@@ -503,25 +511,21 @@ def _delta_to_isnapshot_archived(
     time: npt.NDArray[np.float64],
     intensity_delta: npt.NDArray[np.float64],
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """
-    ### This is an internal function. You shouldn't use it directly unless you know what you are doing.
-
-    This function convert the delta encoding of the intensity timeseries into **ALMOST** IndexedSnapshot format.
-    The np.nan at the end of the intensity timeseries is not included in the IndexedSnapshot format.
+    """Convert delta-encoded intensity to IndexedSnapshot format (without trailing nan).
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows delta encoding format.
-    intensity_delta : npt.NDArray[np.float64]
-        1D array of intensity that follows delta encoding format.
+    time : np.ndarray
+        1D array of time indices in delta encoding format.
+    intensity_delta : np.ndarray
+        1D array of intensity deltas in delta encoding format.
 
     Returns
     -------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format (Without the np.nan at the end).
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format (Without the np.nan at the end).
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format (without trailing nan).
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format (without trailing nan).
     """
 
     # Zip time and intensity_delta into a 2D array
@@ -555,25 +559,21 @@ def _delta_to_isnapshot(
     time: npt.NDArray[np.float64],
     intensity_delta: npt.NDArray[np.float64],
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """
-    ### This is an internal function. You shouldn't use it directly unless you know what you are doing.
-
-    This function convert the delta encoding of the intensity timeseries into **ALMOST** IndexedSnapshot format.
-    The np.nan at the end of the intensity timeseries is not included in the IndexedSnapshot format.
+    """Convert delta-encoded intensity to IndexedSnapshot format (without trailing nan).
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows delta encoding format.
-    intensity_delta : npt.NDArray[np.float64]
-        1D array of intensity that follows delta encoding format.
+    time : np.ndarray
+        1D array of time indices in delta encoding format.
+    intensity_delta : np.ndarray
+        1D array of intensity deltas in delta encoding format.
 
     Returns
     -------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format (Without the np.nan at the end).
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format (Without the np.nan at the end).
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format (without trailing nan).
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format (without trailing nan).
     """
 
     # Sort the change_time_idx by time
@@ -600,20 +600,19 @@ def _delta_to_isnapshot(
 
 
 def _merge_isnapshot(a: IndexedSnapshot, b: IndexedSnapshot) -> IndexedSnapshot:
-    """
-    Merge two IndexedSnapshot timeseries together.
+    """Merge two IndexedSnapshot timeseries together.
 
     Parameters
     ----------
     a : IndexedSnapshot
-        The first IndexedSnapshot timeseries.
+        First IndexedSnapshot.
     b : IndexedSnapshot
-        The second IndexedSnapshot timeseries.
+        Second IndexedSnapshot.
 
     Returns
     -------
-    IndexedSnapshot
-        The merged IndexedSnapshot timeseries.
+    merged : IndexedSnapshot
+        Merged IndexedSnapshot.
     """
     if len(a.intensity_delta) == 0 and len(b.intensity_delta) == 0:
         return IndexedSnapshot()
@@ -641,23 +640,21 @@ def _merge_isnapshot(a: IndexedSnapshot, b: IndexedSnapshot) -> IndexedSnapshot:
 def _isnapshot_sum_and_duration(
     time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 ) -> tuple[float, float]:
-    """
-    ### This is an internal function. Use `IndexedSnapshot.mean()` instead.
-
-    Calculate the total depth of the intensity timeseries.
+    """Calculate total depth and duration. Use `IndexedSnapshot.sum()` instead.
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
 
     Returns
     -------
-    mean: float
-        The total depth of the intensity timeseries.
-
+    depth : float
+        Total depth.
+    duration : float
+        Total duration.
     """
     # each_intensity_duration = np.diff(time)
     depth: float = 0.0
@@ -675,23 +672,19 @@ def _isnapshot_sum_and_duration(
 def _isnapshot_mean(
     time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64]
 ) -> float:
-    """
-    ### This is an internal function. Use `IndexedSnapshot.mean()` instead.
-
-    Calculate the mean of the intensity timeseries.
+    """Calculate the mean intensity. Use `IndexedSnapshot.mean()` instead.
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
 
     Returns
     -------
-    mean: float
-        The mean of the intensity timeseries.
-
+    mean : float
+        Mean intensity.
     """
     depth, duration = _isnapshot_sum_and_duration(time, intensity)
 
@@ -706,22 +699,19 @@ def _isnapshot_sum_squared_error(
     time: npt.NDArray[np.float64],
     intensity: npt.NDArray[np.float64],
 ) -> float:
-    """
-    ### This is an internal function. Use `IndexedSnapshot.standard_deviation()` instead.
-
-    Calculate the sum of squared error of the intensity timeseries.
+    """Calculate the sum of squared error. Use `IndexedSnapshot.sum_squared_error()` instead.
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
 
     Returns
     -------
-    sum of squared error: float
-        The sum of squared error of the intensity timeseries.
+    sse : float
+        Sum of squared error.
     """
     mean = _isnapshot_mean(time, intensity)
     sse = 0
@@ -738,22 +728,21 @@ def _isnapshot_variance(
     intensity: npt.NDArray[np.float64],
     biased: bool = False,
 ) -> float:
-    """
-    ### This is an internal function. Use `IndexedSnapshot.standard_deviation()` instead.
-
-    Calculate the variance of the intensity timeseries.
+    """Calculate the variance. Use `IndexedSnapshot.variance()` instead.
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
+    biased : bool, optional
+        If True, use the biased estimator. Defaults to False.
 
     Returns
     -------
-    variance: float
-        The variance of the intensity timeseries.
+    var : float
+        Variance.
     """
     depth, duration = _isnapshot_sum_and_duration(time, intensity)
     sse = _isnapshot_sum_squared_error(time, intensity)
@@ -770,22 +759,21 @@ def _isnapshot_standard_deviation(
     intensity: npt.NDArray[np.float64],
     biased: bool = False,
 ) -> float:
-    """
-    ### This is an internal function. Use `IndexedSnapshot.standard_deviation()` instead.
-
-    Calculate the standard deviation of the intensity timeseries.
+    """Calculate the standard deviation. Use `IndexedSnapshot.variance()` instead.
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
+    biased : bool, optional
+        If True, use the biased estimator. Defaults to False.
 
     Returns
     -------
-    standard deviation: float
-        The standard deviation of the intensity timeseries.
+    std : float
+        Standard deviation.
     """
     return _isnapshot_variance(time, intensity, biased) ** 0.5
 
@@ -796,29 +784,21 @@ def _isnapshot_coef_var(
     intensity: npt.NDArray[np.float64],
     biased: bool = False,
 ) -> float:
-    """
-    ### This is an internal function. Use `IndexedSnapshot.standard_deviation()` instead.
-
-    Calculate the coefficient of variation of the intensity timeseries.
+    """Calculate the coefficient of variation. Use `IndexedSnapshot.coef_variation()` instead.
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
-    mean : float, optional
-        The mean of the intensity timeseries, If None, it will be calculated, by default None
-    sse : float, optional
-        The sum of squared error of the intensity timeseries, If None, it will be calculated, by default None
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
     biased : bool, optional
-        Whether to use the biased estimator of the standard deviation, by default False.
+        If True, use the biased estimator. Defaults to False.
 
     Returns
     -------
-    coefficient of variation: float
-        The coefficient of variation of the intensity timeseries.
-
+    cv : float
+        Coefficient of variation.
     """
     # Coefficient of variation
     mean = _isnapshot_mean(time, intensity)
@@ -835,23 +815,21 @@ def _isnapshot_skew(
     intensity: npt.NDArray[np.float64],
     biased: bool = False,
 ) -> float:
-    """
-    ### This is an internal function. Use `IndexedSnapshot.standard_deviation()` instead.
-
-    Calculate the skewness of the intensity timeseries.
-    The standard deviation is calculated with the unbiased estimator.
+    """Calculate the skewness. Use `IndexedSnapshot.skewness()` instead.
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
+    biased : bool, optional
+        If True, use the biased estimator. Defaults to False.
 
     Returns
     -------
-    skewness : float
-        The skewness of the intensity timeseries.
+    skew : float
+        Skewness.
     """
     # Skewness
     depth, duration = _isnapshot_sum_and_duration(time, intensity)
@@ -882,23 +860,21 @@ def _isnapshot_pDry(
     intensity: npt.NDArray[np.float64],
     threshold: float = 0,
 ) -> float:
-    """
-    ### This is an internal function. Use `IndexedSnapshot.pDry()` instead.
-
-    Calculate the probability of dryness of the intensity timeseries with a threshold.
+    """Calculate the probability of dryness. Use `IndexedSnapshot.pDry()` instead.
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
     threshold : float, optional
-        The threshold of dryness, by default 0
+        Intensity threshold. Defaults to 0.
 
     Returns
     -------
-    probability of dryness : float
+    p_dry : float
+        Probability of dryness.
     """
     duration = 0
     wet_duration = 0
@@ -921,25 +897,23 @@ def _isnapshot_acf(
     intensity: npt.NDArray[np.float64],
     lag: Optional[float] = 1,
 ):
-    """
-    ### This is an internal function. Use `IndexedSnapshot.acf()` instead.
+    """Calculate the autocorrelation coefficient. Use `IndexedSnapshot.autocorr_coef()` instead.
 
-    Calculate the n-lag autocorrelation coefficient of the intensity timeseries.
-    It's basically Cov(X_t, X_{t+lag}) / Var(X_t)
+    Computed as Cov(X_t, X_{t+lag}) / Var(X_t).
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
-    lag : int, optional
-        The lag of the autocorrelation coefficient, by default 1
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
+    lag : float, optional
+        Lag for the autocorrelation. Defaults to 1.
 
     Returns
     -------
-    n-lag Autocorrelation coefficient: float
-        The n-lag autocorrelation coefficient of the intensity timeseries.
+    acf : float
+        Autocorrelation coefficient.
     """
     if lag == 0:
         return 1
@@ -992,30 +966,25 @@ def mod(a: float, b: float) -> float:
 def _isnapshot_rescale(
     time: npt.NDArray[np.float64], intensity: npt.NDArray[np.float64], scale: float, abs_tol: float = 1e-10
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """
-    ### This is an internal function. Use `IndexedSnapshot.standard_deviation()` instead.
-
-    Rescale the IndexedSnapshot timeseries to a different scale.
-    New time index will be divided by the scale. And the intensity will be multiplied by the scale.
-    All the time index will be divisible by the scale.
+    """Rescale the IndexedSnapshot timeseries. Use `IndexedSnapshot.rescale()` instead.
 
     Parameters
     ----------
-    time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
+    time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
     scale : float
-        The scale to be rescaled to.
+        Target scale to rescale to.
     abs_tol : float, optional
-        The absolute tolerance for floating point error, by default 1e-10
+        Absolute tolerance for floating-point comparisons. Defaults to 1e-10.
 
     Returns
     -------
-    scaled time : npt.NDArray[np.float64]
-        1D array of time index that follows IndexedSnapshot format.
-    scaled intensity : npt.NDArray[np.float64]
-        1D array of intensity that follows IndexedSnapshot format.
+    scaled_time : np.ndarray
+        1D array of time indices in IndexedSnapshot format.
+    scaled_intensity : np.ndarray
+        1D array of intensities in IndexedSnapshot format.
 
     Examples
     --------

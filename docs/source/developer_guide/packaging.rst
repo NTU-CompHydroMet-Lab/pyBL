@@ -1,4 +1,0 @@
-.. _packaging:
-
-Packaging pybl
-==============
